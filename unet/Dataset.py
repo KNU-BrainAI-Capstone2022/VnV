@@ -8,7 +8,7 @@ from torchvision.datasets import VOCSegmentation
 class CustomVOCSegmentation(VOCSegmentation):
     def __init__(self, root, image_set="train", download=True, transforms=None):
         super().__init__(root=root, image_set=image_set, download=download, transforms=transforms)
-        self.voc_classes [
+        self.voc_classes = [
             "background",
             "aeroplane",
             "bicycle",
@@ -57,9 +57,9 @@ class CustomVOCSegmentation(VOCSegmentation):
 
     def _convert_to_segmentation_mask(self,mask):
         height, width = mask.shape[:2]
-        segmentation_mask = np.zeros((height, width, len(self.voc_classes)), dtype=np.int32)
+        segmentation_mask = np.zeros((height, width, len(self.voc_classes)), dtype=np.float32)
         for label_index, label in enumerate(self.voc_colormap):
-            segmentation_mask[:, :, label_index] = np.all(mask == label, axis=-1).astype(np.int32)
+            segmentation_mask[:, :, label_index] = np.all(mask == label, axis=-1).astype(np.float32)
         return torch.from_numpy(segmentation_mask.transpose(2,0,1))
     
     def __getitem__(self, idx):
@@ -67,6 +67,7 @@ class CustomVOCSegmentation(VOCSegmentation):
         target = Image.open(self.masks[idx])
         
         print(input.shape,target.shape)
+        input = input / 255.0
         data = (input,target)
         if self.transforms:
             data = self.transforms(data)
