@@ -36,10 +36,10 @@ class transforms_train(object):
     def __init__(self,base_size=512,crop_size=448,mean=(0.485,0.456,0.406),std=(0.229,0.224,0.225)):
         transforms = []
         transforms.extend(
-            [RandomResize(base_size),
+            [T.PILToTensor(),
+             RandomResize(base_size),
              T.RandomHorizontalFlip(),
-             T.RandomCrop(crop_size),
-             T.PILToTensor(),
+            #  T.RandomCrop(crop_size),
              ConvertImageDtype(torch.float),
              Normalize(mean,std)]
         )
@@ -51,8 +51,8 @@ class transforms_eval(object):
     def __init__(self,base_size=512,mean=(0.485,0.456,0.406),std=(0.229,0.224,0.225)):
         transforms = []
         transforms.extend(
-            [RandomResize(base_size),
-             T.PILToTensor(),
+            [T.PILToTensor(),
+             RandomResize(base_size),
              ConvertImageDtype(torch.float),
              Normalize(mean,std)]
         )

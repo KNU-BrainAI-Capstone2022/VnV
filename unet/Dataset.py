@@ -66,7 +66,6 @@ class CustomVOCSegmentation(VOCSegmentation):
         input = Image.open(self.images[idx]).convert('RGB')
         target = Image.open(self.masks[idx])
         
-        input = input / 255.0
         data = (input,target)
         if self.transforms:
             data = self.transforms(data)
