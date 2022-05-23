@@ -1,8 +1,9 @@
+import os
 import torch
 from torch import nn
 
 class Unet(nn.Module):
-    def __init__(self):
+    def __init__(self,num_classes=21): # Pascal VOC 2012
         super(Unet,self).__init__()
         
         def CBR2D(in_c,out_c,k=3,s=1,padding=1,bias=True):
@@ -52,7 +53,7 @@ class Unet(nn.Module):
         self.dec1_2 = CBR2D(in_c=2*64,out_c=64)
         self.dec1_1 = CBR2D(in_c=64,out_c=64)
         
-        self.fc = nn.Conv2d(in_channels=64,out_channels=1,
+        self.fc = nn.Conv2d(in_channels=64,out_channels=num_classes,
                             kernel_size=1,stride=1,padding=0,bias=True)
     
     def forward(self, x):

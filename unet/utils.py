@@ -9,16 +9,16 @@ def save(ckpt_dir,net,optim,epoch):
                os.path.join(ckpt_dir,f"model_epoch{epoch}.pth"))
 
 # 모델 로드 함수
-def load(ckpt_dir,net,optim):
-    if not os.path.exists(ckpt_dir):
+def load(ckpt_dir,name,net,optim):
+    ckpt = os.path.join(ckpt_dir,name)
+    if not os.path.exists(ckpt):
         epoch = 0
+        print("There is no checkpoint")
         return net,optim,epoch
-    ckpt_list = os.listdir(ckpt_dir)
-    ckpt_list.sort(key=lambda f:int(''.join(filter(str.isdigit,f))))
 
-    dict_model = torch.load(os.path.join(ckpt_dir,ckpt_list[-1]))
+    dict_model = torch.load(ckpt)
 
     net.load_state_dict(dict_model['net'])
     optim.load_state_dict(dict_model['optim'])
-    epoch = int(''.join(filter(str.isdigit,ckpt_list[-1])))
+    epoch = int(''.join(filter(str.isdigit,name)))
     return net,optim,epoch
