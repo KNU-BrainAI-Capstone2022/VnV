@@ -18,7 +18,7 @@ def get_args():
     parser = argparse.ArgumentParser(description="PyTorch Segmentation Training")
     parser.add_argument("--dataset", default="voc", type=str, help="dataset name")
     parser.add_argument("--model", default="unet", type=str, help="model name")
-    parser.add_argument("-j", "--num_workers", default=4, type=int, help="number of data loading workers (default: 16)")
+    parser.add_argument("-j", "--num_workers", default=0, type=int, help="number of data loading workers (default: 0)")
     parser.add_argument("-b", "--batch-size", default=32, type=int, help="images per gpu")
     parser.add_argument("--epochs", default=150, type=int, help="number of total epochs to run")
     parser.add_argument("--lr", default=1e-3, type=float, help="initial learning rate")
@@ -120,6 +120,8 @@ if __name__=="__main__":
     momentum = float(args.momentum)
     weight_decay = float(args.weight_decay)
     num_workers = int(args.num_workers)
+    print(num_workers)
+    33333333333
     # GPU
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     # DataLoader
@@ -150,7 +152,7 @@ if __name__=="__main__":
     logfile = open(os.path.join(log_dir,"trainlog"),"a")
     # 모델 생성
     if args.model == "unet":
-        model = Unet(num_classes=num_classes)
+        model = Unet(num_classes=num_classes).to(device)
     params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     # 손실 함수 정의
     loss_fn = torch.nn.CrossEntropyLoss()
