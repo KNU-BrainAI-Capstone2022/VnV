@@ -5,7 +5,7 @@ from torchvision.transforms import Compose
 
 class ToTensor(object):
     def __call__(self, data):
-        data['input'] = data['input'].transpose((2,0,1)).astype('float')
+        data['input'] = data['input'].transpose((2,0,1))
         data['target'] = data['target'].transpose((2,0,1))
 
         data['input'] = torch.from_numpy(data['input'])
@@ -39,7 +39,7 @@ class ConvertImageDtype(object):
 
     def __call__(self, data):
         data['input'] = F.convert_image_dtype(data['input'], self.dtype)
-        data['target'] = F.convert_image_dtype(data['target'], self.dtype)
+        data['target'] = data['target'].type(self.dtype)
         return data
 
 class Normalize(object):
@@ -49,11 +49,6 @@ class Normalize(object):
 
     def __call__(self, data):
         data['input'] = F.normalize(data['input'], mean=self.mean, std=self.std)
-        return data
-
-class Squeeze(object):
-    def __call__(self, data):
-        data['target'] = torch.squeeze(data['target'])
         return data
 
 class transforms_train(object):

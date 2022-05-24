@@ -1,3 +1,4 @@
+#%%
 import os
 from turtle import down
 import numpy as np
@@ -54,7 +55,7 @@ class CustomVOCSegmentation(torch.utils.data.Dataset):
         [0, 64, 128],
     ]
     
-    def __init__(self, data_dir='./dataset/VOCdevkit/VOC2012', image_set="train", transform=None):
+    def __init__(self, data_dir, image_set="train", transform=None):
         self.data_dir = data_dir
         self.image_set = image_set
         self.transform = transform
@@ -102,19 +103,19 @@ if __name__ == "__main__":
     from Transform import transforms_train
 
     def decode_segmap(masks,colormap):
-        color_map = torch.tensor(colormap)
         r_mask = torch.zeros_like(masks,dtype=torch.uint8)
         g_mask = torch.zeros_like(masks,dtype=torch.uint8)
         b_mask = torch.zeros_like(masks,dtype=torch.uint8)
         for k in range(len(colormap)):
             indices = masks == k
-            r_mask[indices] = color_map[k,0]
-            g_mask[indices] = color_map[k,1]
-            b_mask[indices] = color_map[k,2]
+            print(r_mask[indices].shape)
+            r_mask[indices] = colormap[k][0]
+            g_mask[indices] = colormap[k][1]
+            b_mask[indices] = colormap[k][2]
         return torch.cat([r_mask,g_mask,b_mask],dim=1)
 
     root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    download_pascalvoc(os.path.join(root_dir,'dataset'))
+    # download_pascalvoc(os.path.join(root_dir,'dataset'))
     data_dir = os.path.join(root_dir,'dataset','VOCdevkit','VOC2012')
     
     train_dataset = CustomVOCSegmentation(data_dir=data_dir,
@@ -131,7 +132,7 @@ if __name__ == "__main__":
         print(targets.shape)
         targets = decode_segmap(targets,colormap)
         print(targets.shape)
-        ax[1].imshow(torchvision.utils.make_grid(targets.cpu(), normalize=False).permute(1,2,0))
+        ax[1].imshow(torchvision.utils.make_grid(targets.cpu()).permute(1,2,0))
         ax[1].set_title("Target")
         ax[1].axis('off')
         
