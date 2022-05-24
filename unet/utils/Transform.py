@@ -6,7 +6,6 @@ from torchvision.transforms import Compose
 class ToTensor(object):
     def __call__(self, data):
         data['input'] = data['input'].transpose((2,0,1))
-        data['target'] = data['target'].transpose((2,0,1))
 
         data['input'] = torch.from_numpy(data['input'])
         data['target'] = torch.from_numpy(data['target'])
