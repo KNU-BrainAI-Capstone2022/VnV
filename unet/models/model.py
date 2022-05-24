@@ -12,23 +12,23 @@ class Unet(nn.Module):
                                   nn.BatchNorm2d(num_features=out_c),
                                   nn.ReLU())
             return block
-        
-        self.enc1_1 = CBR2D(in_c=1,out_c=64)
+        # 512 3
+        self.enc1_1 = CBR2D(in_c=3,out_c=64)
         self.enc1_2 = CBR2D(in_c=64,out_c=64)
         self.pool1 = nn.MaxPool2d(kernel_size=2,stride=2)
-        
+        # 256 64
         self.enc2_1 = CBR2D(in_c=64,out_c=128)
         self.enc2_2 = CBR2D(in_c=128,out_c=128)
         self.pool2 = nn.MaxPool2d(kernel_size=2,stride=2)
-        
+        # 128 128
         self.enc3_1 = CBR2D(in_c=128,out_c=256)
         self.enc3_2 = CBR2D(in_c=256,out_c=256)
         self.pool3 = nn.MaxPool2d(kernel_size=2,stride=2)
-        
+        # 64 256
         self.enc4_1 = CBR2D(in_c=256,out_c=512)
         self.enc4_2 = CBR2D(in_c=512,out_c=512)
         self.pool4 = nn.MaxPool2d(kernel_size=2,stride=2)
-        
+        # 32 512
         self.enc5_1 = CBR2D(in_c=512,out_c=1024)
         
         self.dec5_1 = CBR2D(in_c=1024,out_c=512)

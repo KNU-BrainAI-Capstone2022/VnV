@@ -20,7 +20,7 @@ def get_args():
     parser.add_argument("--model", default="unet", type=str, help="model name")
     parser.add_argument("-j", "--num_workers", default=4, type=int, help="number of data loading workers (default: 16)")
     parser.add_argument("-b", "--batch-size", default=32, type=int, help="images per gpu")
-    parser.add_argument("--epochs", default=30, type=int, help="number of total epochs to run")
+    parser.add_argument("--epochs", default=150, type=int, help="number of total epochs to run")
     parser.add_argument("--lr", default=1e-3, type=float, help="initial learning rate")
     parser.add_argument("--momentum", default=0.9, type=float, help="momentum")
     parser.add_argument("--weight-decay",default=1e-4,type=float,help="weight_decay")
@@ -32,8 +32,8 @@ def train_one_epoch(model,criterion,optimizer,data_loader,lr_scheduler,epoch,bes
     model.train()
     loss_arr = []
     iou_arr = []
-    for batch, (input, target) in enumerate(data_loader,1):
-        input, target = input.to(device), target.to(device)
+    for batch, data in enumerate(data_loader,1):
+        input, target = data['input'].to(device), data['target'].squeeze().to(device)
         # Forward
         output = model(input)
         # Backward
@@ -75,8 +75,8 @@ def evaluate(model,criterion,data_loader,epoch=1,mode="val"):
     loss_arr=[]
     iou_arr=[]
     with torch.no_grad():
-        for input, target in data_loader:
-            input, target = input.to(device), target.to(device)
+        for data in data_loader:
+            input, target = data['input'].to(device), data['target'].squeeze().to(device)
             # Forward
             output = model(input)
             # Metric
@@ -114,17 +114,17 @@ if __name__=="__main__":
     val_dir = os.path.join(data_dir,"val")
     ckpt_dir = os.path.join(root_dir,"checkpoint")
     log_dir = os.path.join(root_dir,"logs")
-    batch_size = args.batch_size
-    num_epoch = args.epochs
-    lr = args.lr
-    momentum = args.momentum
-    weight_decay = args.weight_decay
-    num_workers = args.num_workers
+    batch_size = int(args.batch_size)
+    num_epoch = int(args.epochs)
+    lr = int(args.lr)
+    momentum = float(args.momentum)
+    weight_decay = float(args.weight_decay)
+    num_workers = int(args.num_workers)
     # GPU
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     # DataLoader
-    train_ds, num_classes = get_dataset(data_dir,"train",transform=get_transform(train=True))
-    test_ds, _ = get_dataset(data_dir,"val",transform=get_transform(train=False))
+    train_ds, num_classes = get_dataset(data_dir,args.dataset,"train",transform=get_transform(train=True))
+    test_ds, _ = get_dataset(data_dir,args.dataset,"val",transform=get_transform(train=False))
     colormap = train_ds.colormap
     classes = train_ds.classes
 
@@ -151,7 +151,7 @@ if __name__=="__main__":
     # 모델 생성
     if args.model == "unet":
         model = Unet(num_classes=num_classes)
-    params = sum(p.numel for p in model.parameters if p.requires_grad)
+    params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     # 손실 함수 정의
     loss_fn = torch.nn.CrossEntropyLoss()
     # 옵티마이저 정의
@@ -167,6 +167,8 @@ if __name__=="__main__":
     # 학습하던 모델 있으면 로드
     if args.resume:
         model, optim, start_epoch, best_miou = load(ckpt_dir=ckpt_dir,name=args.resume,net=model,optim=optim)
+    else:
+        start_epoch, best_miou = 0, 0
     start_time = time.time()
     if start_epoch == 0:
         logfile.write("\nTrain Start\n")
