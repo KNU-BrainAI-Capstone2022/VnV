@@ -110,6 +110,7 @@ if __name__ == "__main__":
             b_mask[indices] = color_map[k,2]
         return torch.cat([r_mask,g_mask,b_mask],dim=1)
 
+    download_pascalvoc()
     root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     data_dir = os.path.join(root_dir,'dataset','VOCdevkit','VOC2012')
     
