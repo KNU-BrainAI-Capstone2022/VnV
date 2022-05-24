@@ -23,7 +23,7 @@ def get_args():
     parser.add_argument("--epochs", default=30, type=int, help="number of total epochs to run")
     parser.add_argument("--lr", default=1e-3, type=float, help="initial learning rate")
     parser.add_argument("--momentum", default=0.9, type=float, help="momentum")
-    parser.add_argument("--weight-decay",default=1e-4,type=float,help="weight decay (default: 1e-4)",help="weight_decay",)
+    parser.add_argument("--weight-decay",default=1e-4,type=float,help="weight_decay")
     parser.add_argument("--resume", default="", type=str, help="path of checkpoint")
     parser.add_argument("--test-only",help="Only test the model",action="store_true")
     return parser.parse_args()
