@@ -1,4 +1,5 @@
 import os
+from turtle import down
 import numpy as np
 from PIL import Image
 import torch
@@ -78,6 +79,10 @@ class CustomVOCSegmentation(torch.utils.data.Dataset):
         if self.transform is not None:
             data = self.transform(data)
         return data
+
+def download_pascalvoc(data_dir='./dataset'):
+    from torchvision.datasets import VOCSegmentation
+    _ = VOCSegmentation(root=data_dir,year="2012",image_set="trainval",download=True)
 
 def get_dataset(dir_path,name,image_set,transform):
     paths = {
