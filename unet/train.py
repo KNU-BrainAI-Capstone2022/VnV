@@ -123,8 +123,8 @@ if __name__=="__main__":
     # GPU
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     # DataLoader
-    train_ds, num_classes = get_dataset(data_dir,"train",transforms=get_transform(train=True))
-    test_ds, _ = get_dataset(data_dir,"val",transforms=get_transform(train=False))
+    train_ds, num_classes = get_dataset(data_dir,"train",transform=get_transform(train=True))
+    test_ds, _ = get_dataset(data_dir,"val",transform=get_transform(train=False))
     colormap = train_ds.colormap
     classes = train_ds.classes
 
