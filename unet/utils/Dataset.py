@@ -80,7 +80,7 @@ class CustomVOCSegmentation(torch.utils.data.Dataset):
             data = self.transform(data)
         return data
 
-def download_pascalvoc(data_dir='./dataset'):
+def download_pascalvoc(data_dir):
     from torchvision.datasets import VOCSegmentation
     _ = VOCSegmentation(root=data_dir,year="2012",image_set="trainval",download=True)
 
@@ -110,14 +110,14 @@ if __name__ == "__main__":
             b_mask[indices] = color_map[k,2]
         return torch.cat([r_mask,g_mask,b_mask],dim=1)
 
-    download_pascalvoc()
     root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    download_pascalvoc(os.path.join(root_dir,'dataset'))
     data_dir = os.path.join(root_dir,'dataset','VOCdevkit','VOC2012')
     
     train_dataset = CustomVOCSegmentation(data_dir=data_dir,
                                           image_set="train",
                                           transform=transforms_train())
-    colormap = CustomVOCSegmentation.VOC_COLORMAP
+    colormap = CustomVOCSegmentation.colormap
     train_loader = DataLoader(train_dataset,batch_size=4,shuffle=True)
     for data in train_loader:
         images,targets = data['input'],data['target']
