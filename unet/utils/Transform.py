@@ -39,7 +39,6 @@ class ConvertImageDtype(object):
 
     def __call__(self, data):
         data['input'] = F.convert_image_dtype(data['input'], self.dtype)
-        data['target'] = data['target'].type(self.dtype)
         return data
 
 class Normalize(object):

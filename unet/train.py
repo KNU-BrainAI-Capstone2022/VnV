@@ -120,8 +120,6 @@ if __name__=="__main__":
     momentum = float(args.momentum)
     weight_decay = float(args.weight_decay)
     num_workers = int(args.num_workers)
-    print(num_workers)
-    33333333333
     # GPU
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     # DataLoader
