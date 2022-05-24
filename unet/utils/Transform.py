@@ -9,7 +9,7 @@ class ToTensor(object):
         data['target'] = data['target'].transpose((2,0,1))
 
         data['input'] = torch.from_numpy(data['input'])
-        data['target'] = torch.from_numpy(data['target'])
+        data['target'] = torch.from_numpy(data['target'],dtype=torch.long)
 
         data['input'] = data['input'] / 255.0
         return data
