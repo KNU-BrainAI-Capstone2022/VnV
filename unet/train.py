@@ -1,20 +1,21 @@
 import os
-import time
 import numpy as np
+import matplotlib.pyplot as plt
 
 import torch
 import torchvision
 from torch.utils.data import DataLoader
 
-from model import *
-from utils import save,load
-from transforms import transform_train,transform_eval
+from models.model import Unet
+from utils.Util import make_figure,make_iou_bar,save,load
+from utils.Dataset import get_dataset
+from utils.Transform import get_transform
+from utils.Metric import IOU
 
 def get_args():
     import argparse
 
     parser = argparse.ArgumentParser(description="PyTorch Segmentation Training")
-    parser.add_argument("--data_path", default="voc2012", type=str, help="dataset path")
     parser.add_argument("--dataset", default="voc", type=str, help="dataset name")
     parser.add_argument("--model", default="unet", type=str, help="model name")
     parser.add_argument("-j", "--num_workers", default=4, type=int, help="number of data loading workers (default: 16)")
@@ -24,30 +25,13 @@ def get_args():
     parser.add_argument("--momentum", default=0.9, type=float, help="momentum")
     parser.add_argument("--weight-decay",default=1e-4,type=float,help="weight decay (default: 1e-4)",help="weight_decay",)
     parser.add_argument("--resume", default="", type=str, help="path of checkpoint")
-    parser.add_argument("--test-only",dest="test_only",help="Only test the model",action="store_true")
+    parser.add_argument("--test-only",help="Only test the model",action="store_true")
     return parser.parse_args()
 
-def get_dataset(dir_path,name,image_set,transform):
-    def sbd(*args, **kwargs):
-        return torchvision.datasets.SBDataset(*args, mode="segmentation", **kwargs)
-    paths = {
-        "voc": (dir_path, torchvision.datasets.VOCSegmentation, 21),
-        "voc_aug": (dir_path, sbd, 21),
-    }
-    p, ds_fn, num_classes = paths[name]
-    ds = ds_fn(p, image_set=image_set,download=True,transform=transform)
-    return ds,num_classes
-
-# 부수적인 Function
-fn_tonumpy = lambda x:x.to('cpu').detach().numpy().transpose(0,2,3,1)
-def fn_denorm(x,mean=(0.485,0.456,0.406),std=(0.229,0.224,0.225)):
-    for i in range(x.shape[0]):
-        x[i] = (x[i]* std[i]) + mean[i]
-    return x
-
-def train_one_epoch(model,criterion,optimizer,data_loader,lr_scheduler,device,epoch):
+def train_one_epoch(model,criterion,optimizer,data_loader,lr_scheduler,epoch,best_miou):
     model.train()
     loss_arr = []
+    iou_arr = []
     for batch, (input, target) in enumerate(data_loader,1):
         input, target = input.to(device), target.to(device)
         # Forward
@@ -58,36 +42,74 @@ def train_one_epoch(model,criterion,optimizer,data_loader,lr_scheduler,device,ep
         loss.backward()
         optimizer.step()
         lr_scheduler.step()
-
+        # Metric
         loss_arr.append(loss.item())
+        iou = IOU(output,target,num_classes).tolist()
+        iou_arr.append(iou)
+        loss_mean = np.mean(loss_arr)
+        miou = np.mean(iou_arr)
         # Result
-        print(f"TRAIN: EPOCH {epoch:04d} / {num_epoch:04d} | BATCH {batch:04d} / {num_batch_train:04d} | LOSS {np.mean(loss_arr):.4f}")
+        line = f"TRAIN: EPOCH {epoch:04d} / {num_epoch:04d} | BATCH {batch:04d} / {num_batch_train:04d} | LOSS {loss_mean:.4f} | mIOU {miou:.4f}"
+        print(line)
+        logfile.write(line)
         # Tensorboard
-        input_ = fn_tonumpy(fn_denorm(X,mean=0.5,std=0.5))
-        label_ = fn_tonumpy(Y)
-        output_ = fn_tonumpy(fn_class(pred))
+        writer_train.add_scalar('loss',loss_mean,(epoch-1)*num_batch_train+batch)
+        writer_train.add_scalar('mIOU',miou,(epoch-1)*num_batch_train+batch)
+    if best_miou < miou:
+        save(ckpt_dir,model,optim,epoch,miou,"model_best.pth")
+        best_miou = miou
+    if epoch % 30:
+        save(ckpt_dir,model,optim,epoch,best_miou)
+    # Tensorboard
+    fig = make_figure(input,output,target,colormap)
+    iou_bar = make_iou_bar(np.mean(iou_arr,axis=0),classes[1:])
+    writer_train.add_figure('Images',fig,epoch)
+    writer_train.add_figure('IOU',iou_bar,epoch)
 
-        writer_train.add_image('input',input_,num_batch_train*(epoch-1)+batch,dataformats='NHWC')
-        writer_train.add_image('label',label_,num_batch_train*(epoch-1)+batch,dataformats='NHWC')
-        writer_train.add_image('output',output_,num_batch_train*(epoch-1)+batch,dataformats='NHWC')
-    writer_train.add_scalar('loss',np.mean(loss_arr),epoch)
-
-def evaluate(model,data_loader,device,num_classes):
+def evaluate(model,criterion,data_loader,epoch=1,mode="val"):
+    if mode == "val":
+        header = "VALID"
+    else:
+        header = "TEST"
     model.eval()
     loss_arr=[]
+    iou_arr=[]
     with torch.no_grad():
         for input, target in data_loader:
             input, target = input.to(device), target.to(device)
             # Forward
             output = model(input)
-            # Result
-        print(f"TEST: LOSS {np.mean(loss_arr):.4f} | mIOU {np.mean(acc_arr):.2f}%")
+            # Metric
+            loss = criterion(output,target)
+            loss_arr.append(loss.item())
+            iou = IOU(output,target,num_classes).tolist()
+            iou_arr.append(iou)
+            loss_mean = np.mean(loss_arr)
+            miou = np.mean(iou_arr)
+        # Result
+        line = f"{header}: LOSS {loss_mean:.4f} | mIOU {miou:.2f}%"
+        print(line)
+        logfile.write(line)
+        if mode == "val":
+            writer_val.add_scalar('loss',loss_mean,(epoch-1)*num_batch_train)
+            writer_val.add_scalar('mIOU',miou,(epoch-1)*num_batch_train)
+            fig = make_figure(input,output,target,colormap)
+            iou_bar = make_iou_bar(np.mean(iou_arr,axis=0),classes[1:])
+            writer_val.add_figure('Images',fig,epoch)
+            writer_val.add_figure('IOU',iou_bar,epoch)
+
 if __name__=="__main__":
+    import time
+    import datetime
     from torch.utils.tensorboard import SummaryWriter
     args = get_args()
     # PATH
     root_dir = os.path.dirname(os.path.abspath(__file__))
-    data_dir = os.path.join(root_dir,"dataset",args.data_path)
+    if args.dataset == "voc":
+        data_dir = os.path.join(root_dir,"dataset","VOCdevkit","VOC2012")
+    else:
+        print("아직")
+        exit()
     train_dir = os.path.join(data_dir,"train")
     val_dir = os.path.join(data_dir,"val")
     ckpt_dir = os.path.join(root_dir,"checkpoint")
@@ -101,9 +123,11 @@ if __name__=="__main__":
     # GPU
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     # DataLoader
-    train_ds, num_classes = get_dataset(args.data_path,args.dataset,"train",transforms=transform_train())
-    test_ds, _ = get_dataset(args.data_path,args.dataset,"val",transforms=transform_eval())
-    
+    train_ds, num_classes = get_dataset(data_dir,"train",transforms=get_transform(train=True))
+    test_ds, _ = get_dataset(data_dir,"val",transforms=get_transform(train=False))
+    colormap = train_ds.colormap
+    classes = train_ds.classes
+
     train_loader = DataLoader(
         train_ds,
         batch_size=batch_size,
@@ -116,90 +140,42 @@ if __name__=="__main__":
         num_workers=num_workers,
         shuffle=False
     )
+    # 부수적인 Variable
+    num_data_train = len(train_ds)
+    num_batch_train = int(np.ceil(num_data_train/batch_size))
+    # Tensorboard
+    writer_train = SummaryWriter(log_dir=os.path.join(log_dir,"train"))
+    writer_val = SummaryWriter(log_dir=os.path.join(log_dir,"val"))
+    # Train log
+    logfile = open(os.path.join(log_dir,"trainlog"),"a")
     # 모델 생성
     if args.model == "unet":
         model = Unet(num_classes=num_classes)
+    params = sum(p.numel for p in model.parameters if p.requires_grad)
     # 손실 함수 정의
-    loss_fn = torch.nn.BCEWithLogitsLoss()
+    loss_fn = torch.nn.CrossEntropyLoss()
     # 옵티마이저 정의
     optim = torch.optim.SGD(model.parameters(),lr=lr,
                             momentum=momentum,
                             weight_decay=weight_decay)
-    lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(
-        optim,
-        [int(0.5*num_epoch),int(0.75*num_epoch)],
-        gamma=0.2)
+    lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optim,[int(0.5*num_epoch),int(0.75*num_epoch)],gamma=0.2)
     if args.test_only:
-        evaluate(model,test_loader,device,num_classes)
+        model, optim, start_epoch, best_miou = load(ckpt_dir=ckpt_dir,name="model_best.pth",net=model,optim=optim)
+        evaluate(model,loss_fn,test_loader,start_epoch,mode="Test")
         exit()
-    
-    # 부수적인 Variable
-    num_data_train = len(train_ds)
-    num_batch_train = int(np.ceil(num_data_train/batch_size))
-    
-    # Tensorboard
-    writer_train = SummaryWriter(log_dir=os.path.join(log_dir,"train"))
-    writer_val = SummaryWriter(log_dir=os.path.join(log_dir,"val"))
+
     # 학습하던 모델 있으면 로드
     if args.resume:
-        model, optim, start_epoch = load(ckpt_dir=ckpt_dir,name=args.resume,net=model,optim=optim)
-
+        model, optim, start_epoch, best_miou = load(ckpt_dir=ckpt_dir,name=args.resume,net=model,optim=optim)
+    start_time = time.time()
+    if start_epoch == 0:
+        logfile.write("\nTrain Start\n")
     for epoch in range(start_epoch+1,num_epoch+1):
-        # Train mode
-        model.train()
-        loss_arr = []
-
-        for batch, data in enumerate(train_loader,start=1):
-            X,Y = data[0].to(device),data[1].to(device)
-            # Forwardprop
-            pred = model(X)
-            # Backprop
-            optim.zero_grad()
-            loss = loss_fn(pred,Y)
-            loss.backward()
-            optim.step()
-
-            loss_arr.append(loss.item())
-
-            print(f"TRAIN: EPOCH {epoch:04d} / {num_epoch:04d} | BATCH {batch:04d} / {num_batch_train:04d} | LOSS {np.mean(loss_arr):.4f}")
-            
-            # Tensorboard
-            input_ = fn_tonumpy(fn_denorm(X,mean=0.5,std=0.5))
-            label_ = fn_tonumpy(Y)
-            
-            writer_train.add_image('input',input_,num_batch_train*(epoch-1)+batch,dataformats='NHWC')
-            writer_train.add_image('label',label_,num_batch_train*(epoch-1)+batch,dataformats='NHWC')
-            writer_train.add_image('output',output_,num_batch_train*(epoch-1)+batch,dataformats='NHWC')
-        
-        writer_train.add_scalar('loss',np.mean(loss_arr),epoch)
-        
-        with torch.no_grad():
-            unet.eval()
-            loss_arr=[]
-            
-            for batch, data in enumerate(val_loader,start=1):
-                X,Y = data[0].to(device),data[1].to(device)
-                # Forwardprop
-                pred = unet(X)
-                # Loss 계산
-                loss = loss_fn(pred,Y)
-                loss_arr.append(loss.item())
-                
-                print(f"VALID: EPOCH {epoch:04d} / {num_epoch:04d} | BATCH {batch:04d} / {num_batch_val:04d} | LOSS {np.mean(loss_arr):.4f}")
-                
-                input_ = fn_tonumpy(fn_denorm(X,mean=0.5,std=0.5))
-                label_ = fn_tonumpy(Y)
-                output_ = fn_tonumpy(fn_class(pred))
-                
-                writer_val.add_image('input',input_,num_batch_val*(epoch-1)+batch,dataformats='NHWC')
-                writer_val.add_image('label',label_,num_batch_val*(epoch-1)+batch,dataformats='NHWC')
-                writer_val.add_image('output',output_,num_batch_val*(epoch-1)+batch,dataformats='NHWC')
-            
-            writer_val.add_scalar('loss',np.mean(loss_arr),epoch)
-
-        # epoch 5마다 저장
-        if epoch % 5 == 0:
-            save(ckpt_dir=ckpt_dir,net=unet,optim=optim,epoch=epoch)
-
+        train_one_epoch(model,loss_fn,optim,train_loader,lr_scheduler,epoch,best_miou)
+        evaluate(model,loss_fn,test_loader,epoch,"val")
+    total_time = time.time() - start_time
+    writer_train.add_text("total time",str(datetime.timedelta(total_time)))
+    writer_train.add_text("Parameters",str(params))
+    logfile.close()
     writer_train.close()
     writer_val.close()
