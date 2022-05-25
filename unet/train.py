@@ -51,7 +51,7 @@ def train_one_epoch(model,criterion,optimizer,data_loader,lr_scheduler,epoch,bes
         # Result
         line = f"TRAIN: EPOCH {epoch:04d} / {num_epoch:04d} | BATCH {batch:04d} / {num_batch_train:04d} | LOSS {loss_mean:.4f} | mIOU {miou:.4f}"
         print(line)
-        logfile.write(line)
+        logfile.write(line+"\n")
         # Tensorboard
         writer_train.add_scalar('loss',loss_mean,(epoch-1)*num_batch_train+batch)
         writer_train.add_scalar('mIOU',miou,(epoch-1)*num_batch_train+batch)
@@ -61,7 +61,7 @@ def train_one_epoch(model,criterion,optimizer,data_loader,lr_scheduler,epoch,bes
     if epoch % 30 == 0:
         save(ckpt_dir,model,optim,epoch,best_miou)
     # Tensorboard
-    fig = make_figure(input,output,target,colormap)
+    fig = make_figure(input,target,output,colormap)
     iou_bar = make_iou_bar(np.mean(iou_arr,axis=0),classes[1:])
     writer_train.add_figure('Images',fig,epoch)
     writer_train.add_figure('IOU',iou_bar,epoch)
@@ -89,11 +89,11 @@ def evaluate(model,criterion,data_loader,epoch=1,mode="val"):
         # Result
         line = f"{header}: LOSS {loss_mean:.4f} | mIOU {miou:.2f}%"
         print(line)
-        logfile.write(line)
+        logfile.write(line+"\n")
         if mode == "val":
             writer_val.add_scalar('loss',loss_mean,(epoch-1)*num_batch_train)
             writer_val.add_scalar('mIOU',miou,(epoch-1)*num_batch_train)
-            fig = make_figure(input,output,target,colormap)
+            fig = make_figure(input,target,output,colormap)
             iou_bar = make_iou_bar(np.mean(iou_arr,axis=0),classes[1:])
             writer_val.add_figure('Images',fig,epoch)
             writer_val.add_figure('IOU',iou_bar,epoch)
@@ -151,7 +151,7 @@ if __name__=="__main__":
     writer_val = SummaryWriter(log_dir=os.path.join(log_dir,"val"))
     # Train log
     logfile = open(os.path.join(log_dir,"trainlog"),"a")
-    logfile.write("Train Start : "+str(datetime.datetime.now()))
+    logfile.write("Train Start : "+str(datetime.datetime.now())+"\n")
     # 모델 생성
     if args.model == "unet":
         model = Unet(num_classes=num_classes).to(device)
@@ -182,7 +182,7 @@ if __name__=="__main__":
     total_time = time.time() - start_time
     writer_train.add_text("total time",str(datetime.timedelta(total_time)))
     writer_train.add_text("Parameters",str(params))
-    logfile.write("Total Time : "+str(datetime.timedelta(total_time)))
+    logfile.write("Total Time : "+str(datetime.timedelta(total_time))+"\n")
     logfile.close()
     writer_train.close()
     writer_val.close()
