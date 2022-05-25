@@ -34,22 +34,22 @@ def train_one_epoch(model,criterion,optimizer,data_loader,lr_scheduler,epoch,bes
     loss_arr = []
     iou_arr = []
     for batch, data in enumerate(data_loader,1):
-        input, target = data['input'].to(device), data['target'].squeeze(1).to(device)
+        inputs, targets = data['input'].to(device), data['target'].squeeze(1).to(device)
         # Forward
-        output = model(input)['out']
+        outputs = model(inputs)['out']
         # Backward
         optimizer.zero_grad()
-        loss = criterion(output,target.type(torch.long))
+        loss = criterion(outputs,targets.type(torch.long))
         loss.backward()
         optimizer.step()
         if lr_scheduler is not None:
             lr_scheduler.step()
         # Metric
         loss_arr.append(loss.item())
-        iou = IOU(output,target,num_classes).tolist()
+        iou = IOU(outputs,targets,num_classes).tolist()
         iou_arr.append(iou)
         loss_mean = np.mean(loss_arr)
-        miou = np.mean(iou_arr)
+        miou = np.nanmean(iou_arr)
         # Result
         line = f"TRAIN: EPOCH {epoch:04d} / {num_epoch:04d} | BATCH {batch:04d} / {num_batch_train:04d} | LOSS {loss_mean:.4f} | mIOU {miou:.4f}"
         print(line)
@@ -63,8 +63,8 @@ def train_one_epoch(model,criterion,optimizer,data_loader,lr_scheduler,epoch,bes
     if epoch % 30 == 0:
         save(ckpt_dir,model,optim,epoch,best_miou)
     # Tensorboard
-    fig = make_figure(input,target,output,colormap)
-    iou_bar = make_iou_bar(np.mean(iou_arr,axis=0),classes[1:])
+    fig = make_figure(inputs,targets,outputs,colormap)
+    iou_bar = make_iou_bar(np.nanmean(iou_arr,axis=0),classes[1:])
     writer_train.add_figure('Images',fig,epoch)
     writer_train.add_figure('IOU',iou_bar,epoch)
 
@@ -78,16 +78,16 @@ def evaluate(model,criterion,data_loader,epoch=1,mode="val"):
     iou_arr=[]
     with torch.no_grad():
         for data in data_loader:
-            input, target = data['input'].to(device), data['target'].squeeze(1).to(device)
+            inputs, targets = data['input'].to(device), data['target'].squeeze(1).to(device)
             # Forward
-            output = model(input)['out']
+            outputs = model(inputs)['out']
             # Metric
-            loss = criterion(output,target.type(torch.long))
+            loss = criterion(outputs,targets.type(torch.long))
             loss_arr.append(loss.item())
-            iou = IOU(output,target,num_classes).tolist()
+            iou = IOU(outputs,targets,num_classes).tolist()
             iou_arr.append(iou)
             loss_mean = np.mean(loss_arr)
-            miou = np.mean(iou_arr)
+            miou = np.nanmean(iou_arr)
         # Result
         line = f"{header}: LOSS {loss_mean:.4f} | mIOU {miou:.2f}"
         print(line)
@@ -95,8 +95,8 @@ def evaluate(model,criterion,data_loader,epoch=1,mode="val"):
         if mode == "val":
             writer_val.add_scalar('loss',loss_mean,(epoch-1)*num_batch_train)
             writer_val.add_scalar('mIOU',miou,(epoch-1)*num_batch_train)
-            fig = make_figure(input,target,output,colormap)
-            iou_bar = make_iou_bar(np.mean(iou_arr,axis=0),classes[1:])
+            fig = make_figure(inputs,targets,outputs,colormap)
+            iou_bar = make_iou_bar(np.nanmean(iou_arr,axis=0),classes[1:])
             writer_val.add_figure('Images',fig,epoch)
             writer_val.add_figure('IOU',iou_bar,epoch)
 
@@ -158,7 +158,7 @@ if __name__=="__main__":
     if args.model == "unet":
         model = Unet(num_classes=num_classes).to(device)
     else:
-        model = fcn_resnet50(pretrained=False)
+        model = fcn_resnet50(pretrained=False).to(device)
     params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     # 손실 함수 정의
     loss_fn = torch.nn.CrossEntropyLoss()
