@@ -114,6 +114,7 @@ if __name__=="__main__":
     val_dir = os.path.join(data_dir,"val")
     ckpt_dir = os.path.join(root_dir,"checkpoint")
     log_dir = os.path.join(root_dir,"logs")
+    log_count = len(os.listdir(log_dir))+1
     batch_size = int(args.batch_size)
     num_epoch = int(args.epochs)
     lr = int(args.lr)
@@ -144,8 +145,8 @@ if __name__=="__main__":
     num_data_train = len(train_ds)
     num_batch_train = int(np.ceil(num_data_train/batch_size))
     # Tensorboard
-    writer_train = SummaryWriter(log_dir=os.path.join(log_dir,"train"))
-    writer_val = SummaryWriter(log_dir=os.path.join(log_dir,"val"))
+    writer_train = SummaryWriter(log_dir=os.path.join(log_dir,f"log{log_count}","train"))
+    writer_val = SummaryWriter(log_dir=os.path.join(log_dir,f"log{log_count}","val"))
     # Train log
     logfile = open(os.path.join(log_dir,"trainlog"),"a")
     logfile.write("Train Start : "+str(datetime.datetime.now()))
