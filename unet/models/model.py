@@ -97,5 +97,5 @@ class Unet(nn.Module):
         dec1_1 = self.dec1_1(dec1_2)
         
         x = self.fc(dec1_1)
-        
-        return x
+        output={'out':x}
+        return output

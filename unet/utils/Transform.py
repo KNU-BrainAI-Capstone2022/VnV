@@ -77,8 +77,8 @@ class transforms_eval(object):
     def __call__(self,data):
         return self.transforms(data)
 
-def get_transform(train=True):
+def get_transform(train=True,base_size=512,crop_size=448):
     if train:
-        return transforms_train(base_size=256,crop_size=224)
+        return transforms_train(base_size=base_size,crop_size=crop_size)
     else:
-        return transforms_eval(base_size=256)
+        return transforms_eval(base_size=base_size)

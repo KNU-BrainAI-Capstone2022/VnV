@@ -36,7 +36,7 @@ def train_one_epoch(model,criterion,optimizer,data_loader,lr_scheduler,epoch,bes
     for batch, data in enumerate(data_loader,1):
         input, target = data['input'].to(device), data['target'].squeeze(1).to(device)
         # Forward
-        output = model(input)
+        output = model(input)['out']
         # Backward
         optimizer.zero_grad()
         loss = criterion(output,target.type(torch.long))
@@ -80,7 +80,7 @@ def evaluate(model,criterion,data_loader,epoch=1,mode="val"):
         for data in data_loader:
             input, target = data['input'].to(device), data['target'].squeeze(1).to(device)
             # Forward
-            output = model(input)
+            output = model(input)['out']
             # Metric
             loss = criterion(output,target.type(torch.long))
             loss_arr.append(loss.item())
@@ -180,8 +180,6 @@ if __name__=="__main__":
     else:
         start_epoch, best_miou = 0, 0
     start_time = time.time()
-    if start_epoch == 0:
-        logfile.write("\nTrain Start\n")
     for epoch in range(start_epoch+1,num_epoch+1):
         train_one_epoch(model,loss_fn,optim,train_loader,lr_scheduler,epoch,best_miou)
         evaluate(model,loss_fn,test_loader,epoch,"val")
