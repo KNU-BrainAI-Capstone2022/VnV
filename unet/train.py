@@ -22,6 +22,7 @@ def get_args():
     parser.add_argument("-j", "--num_workers", default=0, type=int, help="number of data loading workers (default: 0)")
     parser.add_argument("-b", "--batch-size", default=8, type=int, help="images per gpu")
     parser.add_argument("--epochs", default=150, type=int, help="number of total epochs to run")
+    parser.add_argument("--optim", default='sgd',choices=['sgd','adam'], type=str, help="optimizer")
     parser.add_argument("--lr", default=1e-2, type=float, help="initial learning rate")
     parser.add_argument("--momentum", default=0.9, type=float, help="momentum")
     parser.add_argument("--weight-decay",default=1e-4,type=float,help="weight_decay")
@@ -128,8 +129,8 @@ if __name__=="__main__":
     # GPU
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     # DataLoader
-    train_ds, num_classes = get_dataset(data_dir,args.dataset,"train",transform=get_transform(train=True))
-    test_ds, _ = get_dataset(data_dir,args.dataset,"val",transform=get_transform(train=False))
+    train_ds, num_classes = get_dataset(data_dir,args.dataset,"train",transform=get_transform(train=True,base_size=256,crop_size=224))
+    test_ds, _ = get_dataset(data_dir,args.dataset,"val",transform=get_transform(train=False,base_size=256))
     colormap = train_ds.colormap
     classes = train_ds.classes
 
@@ -163,11 +164,15 @@ if __name__=="__main__":
     # 손실 함수 정의
     loss_fn = torch.nn.CrossEntropyLoss()
     # 옵티마이저 정의
-    # optim = torch.optim.Adam(model.parameters(),lr=lr)
-    optim = torch.optim.SGD(model.parameters(),lr=lr,
+    if args.optim == 'adam':
+        optim = torch.optim.Adam(model.parameters(),lr=lr)
+        lr_scheduler = None
+    elif args.optim == 'sgd':
+        optim = torch.optim.SGD(model.parameters(),lr=lr,
                             momentum=momentum,
                             weight_decay=weight_decay)
-    lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optim,[int(0.5*num_epoch),int(0.75*num_epoch)],gamma=0.2)
+        lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optim,[int(0.5*num_epoch),int(0.75*num_epoch)],gamma=0.2)
+    # Check Test-only
     if args.test_only:
         model, optim, start_epoch, best_miou = load(ckpt_dir=ckpt_dir,name="model_best.pth",net=model,optim=optim)
         evaluate(model,loss_fn,test_loader,start_epoch,mode="Test")
