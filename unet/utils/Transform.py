@@ -9,7 +9,7 @@ class ToTensor(object):
         data['target'] = data['target'].transpose((2,0,1))
 
         data['input'] = torch.from_numpy(data['input'])
-        data['target'] = torch.from_numpy(data['target']).type(torch.long)
+        data['target'] = torch.from_numpy(data['target'])
 
         return data
 
@@ -50,7 +50,7 @@ class Normalize(object):
         return data
 
 class transforms_train(object):
-    def __init__(self,base_size=512,crop_size=448,mean=(0.485,0.456,0.406),std=(0.229,0.224,0.225)):
+    def __init__(self,base_size=256,crop_size=224,mean=(0.485,0.456,0.406),std=(0.229,0.224,0.225)):
         transforms = []
         transforms.extend(
             [ToTensor(),
@@ -65,7 +65,7 @@ class transforms_train(object):
         return self.transforms(data)
 
 class transforms_eval(object):
-    def __init__(self,base_size=512,mean=(0.485,0.456,0.406),std=(0.229,0.224,0.225)):
+    def __init__(self,base_size=256,mean=(0.485,0.456,0.406),std=(0.229,0.224,0.225)):
         transforms = []
         transforms.extend(
             [ToTensor(),
@@ -79,6 +79,6 @@ class transforms_eval(object):
 
 def get_transform(train=True):
     if train:
-        return transforms_train(base_size=512,crop_size=448)
+        return transforms_train(base_size=256,crop_size=224)
     else:
-        return transforms_eval(base_size=512)
+        return transforms_eval(base_size=256)

@@ -19,7 +19,7 @@ def get_args():
     parser.add_argument("--dataset", default="voc", type=str, help="dataset name")
     parser.add_argument("--model", default="unet", type=str, help="model name")
     parser.add_argument("-j", "--num_workers", default=0, type=int, help="number of data loading workers (default: 0)")
-    parser.add_argument("-b", "--batch-size", default=32, type=int, help="images per gpu")
+    parser.add_argument("-b", "--batch-size", default=8, type=int, help="images per gpu")
     parser.add_argument("--epochs", default=150, type=int, help="number of total epochs to run")
     parser.add_argument("--lr", default=1e-3, type=float, help="initial learning rate")
     parser.add_argument("--momentum", default=0.9, type=float, help="momentum")
@@ -33,15 +33,16 @@ def train_one_epoch(model,criterion,optimizer,data_loader,lr_scheduler,epoch,bes
     loss_arr = []
     iou_arr = []
     for batch, data in enumerate(data_loader,1):
-        input, target = data['input'].to(device), data['target'].squeeze().to(device)
+        input, target = data['input'].to(device), data['target'].squeeze(1).to(device)
         # Forward
         output = model(input)
         # Backward
-        loss = criterion(output,target)
         optimizer.zero_grad()
+        loss = criterion(output,target.type(torch.long))
         loss.backward()
         optimizer.step()
-        lr_scheduler.step()
+        if lr_scheduler is not None:
+            lr_scheduler.step()
         # Metric
         loss_arr.append(loss.item())
         iou = IOU(output,target,num_classes).tolist()
@@ -76,7 +77,7 @@ def evaluate(model,criterion,data_loader,epoch=1,mode="val"):
     iou_arr=[]
     with torch.no_grad():
         for data in data_loader:
-            input, target = data['input'].to(device), data['target'].squeeze().to(device)
+            input, target = data['input'].to(device), data['target'].squeeze(1).to(device)
             # Forward
             output = model(input)
             # Metric
@@ -87,7 +88,7 @@ def evaluate(model,criterion,data_loader,epoch=1,mode="val"):
             loss_mean = np.mean(loss_arr)
             miou = np.mean(iou_arr)
         # Result
-        line = f"{header}: LOSS {loss_mean:.4f} | mIOU {miou:.2f}%"
+        line = f"{header}: LOSS {loss_mean:.4f} | mIOU {miou:.2f}"
         print(line)
         logfile.write(line+"\n")
         if mode == "val":
@@ -159,10 +160,12 @@ if __name__=="__main__":
     # 손실 함수 정의
     loss_fn = torch.nn.CrossEntropyLoss()
     # 옵티마이저 정의
-    optim = torch.optim.SGD(model.parameters(),lr=lr,
-                            momentum=momentum,
-                            weight_decay=weight_decay)
-    lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optim,[int(0.5*num_epoch),int(0.75*num_epoch)],gamma=0.2)
+    optim = torch.optim.Adam(model.parameters(),lr=lr)
+    lr_scheduler = None
+    # optim = torch.optim.SGD(model.parameters(),lr=lr,
+    #                         momentum=momentum,
+    #                         weight_decay=weight_decay)
+    # lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optim,[int(0.5*num_epoch),int(0.75*num_epoch)],gamma=0.2)
     if args.test_only:
         model, optim, start_epoch, best_miou = load(ckpt_dir=ckpt_dir,name="model_best.pth",net=model,optim=optim)
         evaluate(model,loss_fn,test_loader,start_epoch,mode="Test")
