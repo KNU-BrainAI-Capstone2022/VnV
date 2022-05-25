@@ -81,7 +81,7 @@ def evaluate(model,criterion,data_loader,epoch=1,mode="val"):
             # Forward
             output = model(input)
             # Metric
-            loss = criterion(output,target)
+            loss = criterion(output,target.type(torch.long))
             loss_arr.append(loss.item())
             iou = IOU(output,target,num_classes).tolist()
             iou_arr.append(iou)

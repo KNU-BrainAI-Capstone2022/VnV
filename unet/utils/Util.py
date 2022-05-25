@@ -44,10 +44,8 @@ def mask_colorize(masks,colormap):
     # masks : BxCxHxW
     # if C != 1, argmax
     if masks.size(1) == len(colormap):
-        print(masks.shape)
         _, masks = masks.max(dim=1)
         masks = masks.unsqueeze(dim=1)
-    print(masks.shape)
     color_map = torch.tensor(colormap)
     r_mask = torch.zeros_like(masks,dtype=torch.uint8)
     g_mask = torch.zeros_like(masks,dtype=torch.uint8)
