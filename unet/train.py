@@ -148,6 +148,7 @@ if __name__=="__main__":
     writer_val = SummaryWriter(log_dir=os.path.join(log_dir,"val"))
     # Train log
     logfile = open(os.path.join(log_dir,"trainlog"),"a")
+    logfile.write("Train Start : "+str(datetime.datetime.now()))
     # 모델 생성
     if args.model == "unet":
         model = Unet(num_classes=num_classes).to(device)
@@ -178,6 +179,7 @@ if __name__=="__main__":
     total_time = time.time() - start_time
     writer_train.add_text("total time",str(datetime.timedelta(total_time)))
     writer_train.add_text("Parameters",str(params))
+    logfile.write("Total Time : "+str(datetime.timedelta(total_time)))
     logfile.close()
     writer_train.close()
     writer_val.close()
