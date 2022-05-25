@@ -41,6 +41,13 @@ def voc_denorm(x,mean=(0.485,0.456,0.406),std=(0.229,0.224,0.225)):
     return x
 
 def mask_colorize(masks,colormap):
+    # masks : BxCxHxW
+    # if C != 1, argmax
+    if masks.size(1) == len(colormap):
+        print(masks.shape)
+        _, masks = masks.max(dim=1)
+        masks = masks.unsqueeze(dim=1)
+    print(masks.shape)
     color_map = torch.tensor(colormap)
     r_mask = torch.zeros_like(masks,dtype=torch.uint8)
     g_mask = torch.zeros_like(masks,dtype=torch.uint8)
@@ -52,7 +59,7 @@ def mask_colorize(masks,colormap):
         b_mask[indices] = color_map[k,2]
     return torch.cat([r_mask,g_mask,b_mask],dim=1)
 
-def make_figure(images,outputs,targets,colormap):
+def make_figure(images,targets,outputs,colormap):
     if targets.dim() == 3: # BxHxW
         targets = targets.unsqueeze(1)
     n=images.size(0)

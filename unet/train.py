@@ -58,7 +58,7 @@ def train_one_epoch(model,criterion,optimizer,data_loader,lr_scheduler,epoch,bes
     if best_miou < miou:
         save(ckpt_dir,model,optim,epoch,miou,"model_best.pth")
         best_miou = miou
-    if epoch % 30:
+    if epoch % 30 == 0:
         save(ckpt_dir,model,optim,epoch,best_miou)
     # Tensorboard
     fig = make_figure(input,output,target,colormap)
@@ -114,7 +114,9 @@ if __name__=="__main__":
     val_dir = os.path.join(data_dir,"val")
     ckpt_dir = os.path.join(root_dir,"checkpoint")
     log_dir = os.path.join(root_dir,"logs")
+    os.makedirs(log_dir,exist_ok=True)
     log_count = len(os.listdir(log_dir))+1
+    log_dir = os.path.join(log_dir,f"log{log_count}")
     batch_size = int(args.batch_size)
     num_epoch = int(args.epochs)
     lr = int(args.lr)
@@ -145,8 +147,8 @@ if __name__=="__main__":
     num_data_train = len(train_ds)
     num_batch_train = int(np.ceil(num_data_train/batch_size))
     # Tensorboard
-    writer_train = SummaryWriter(log_dir=os.path.join(log_dir,f"log{log_count}","train"))
-    writer_val = SummaryWriter(log_dir=os.path.join(log_dir,f"log{log_count}","val"))
+    writer_train = SummaryWriter(log_dir=os.path.join(log_dir,"train"))
+    writer_val = SummaryWriter(log_dir=os.path.join(log_dir,"val"))
     # Train log
     logfile = open(os.path.join(log_dir,"trainlog"),"a")
     logfile.write("Train Start : "+str(datetime.datetime.now()))
