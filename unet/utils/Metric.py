@@ -13,9 +13,10 @@ def IOU(output:torch.Tensor,target:torch.Tensor,c:int):
     # Target shape : BxHxW int
     assert output.dim() == 4
     assert target.dim() == 3
+    output = torch.nn.functional.softmax(output,dim=1)
     _,output = torch.max(output,dim=1)
-    output = output.view(-1).type(torch.float)
-    target = target.view(-1).type(torch.float)
+    output = output.contiguous().view(-1).type(torch.float)
+    target = target.contiguous().view(-1).type(torch.float)
     intersection = output[output==target]
     # Background는 제외한다.
     area_intersection = torch.histc(intersection,bins=c,min=0,max=c-1)[1:]

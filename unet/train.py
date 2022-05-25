@@ -22,7 +22,7 @@ def get_args():
     parser.add_argument("-j", "--num_workers", default=0, type=int, help="number of data loading workers (default: 0)")
     parser.add_argument("-b", "--batch-size", default=8, type=int, help="images per gpu")
     parser.add_argument("--epochs", default=150, type=int, help="number of total epochs to run")
-    parser.add_argument("--lr", default=1e-3, type=float, help="initial learning rate")
+    parser.add_argument("--lr", default=1e-2, type=float, help="initial learning rate")
     parser.add_argument("--momentum", default=0.9, type=float, help="momentum")
     parser.add_argument("--weight-decay",default=1e-4,type=float,help="weight_decay")
     parser.add_argument("--resume", default="", type=str, help="path of checkpoint")
