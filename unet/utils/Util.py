@@ -53,6 +53,8 @@ def mask_colorize(masks,colormap):
     return torch.cat([r_mask,g_mask,b_mask],dim=1)
 
 def make_figure(images,outputs,targets,colormap):
+    if targets.dim() == 3: # BxHxW
+        targets = targets.unsqueeze(1)
     n=images.size(0)
     fig, ax = plt.subplots(3,1,figsize=(n*3,9))
     ax[0].imshow(torchvision.utils.make_grid(images.cpu(), normalize=True).permute(1,2,0))
