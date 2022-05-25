@@ -119,12 +119,12 @@ if __name__=="__main__":
     os.makedirs(log_dir,exist_ok=True)
     log_count = len(os.listdir(log_dir))+1
     log_dir = os.path.join(log_dir,f"log{log_count}")
-    batch_size = int(args.batch_size)
-    num_epoch = int(args.epochs)
-    lr = int(args.lr)
-    momentum = float(args.momentum)
-    weight_decay = float(args.weight_decay)
-    num_workers = int(args.num_workers)
+    batch_size = args.batch_size
+    num_epoch = args.epochs
+    lr = args.lr
+    momentum = args.momentum
+    weight_decay = args.weight_decay
+    num_workers = args.num_workers
     # GPU
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     # DataLoader
@@ -163,12 +163,11 @@ if __name__=="__main__":
     # 손실 함수 정의
     loss_fn = torch.nn.CrossEntropyLoss()
     # 옵티마이저 정의
-    optim = torch.optim.Adam(model.parameters(),lr=lr)
-    lr_scheduler = None
-    # optim = torch.optim.SGD(model.parameters(),lr=lr,
-    #                         momentum=momentum,
-    #                         weight_decay=weight_decay)
-    # lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optim,[int(0.5*num_epoch),int(0.75*num_epoch)],gamma=0.2)
+    # optim = torch.optim.Adam(model.parameters(),lr=lr)
+    optim = torch.optim.SGD(model.parameters(),lr=lr,
+                            momentum=momentum,
+                            weight_decay=weight_decay)
+    lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optim,[int(0.5*num_epoch),int(0.75*num_epoch)],gamma=0.2)
     if args.test_only:
         model, optim, start_epoch, best_miou = load(ckpt_dir=ckpt_dir,name="model_best.pth",net=model,optim=optim)
         evaluate(model,loss_fn,test_loader,start_epoch,mode="Test")
