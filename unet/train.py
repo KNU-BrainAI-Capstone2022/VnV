@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import torch
 import torchvision
 from torch.utils.data import DataLoader
+from torchvision.models.segmentation import fcn_resnet50
 
 from models.model import Unet
 from utils.Util import make_figure,make_iou_bar,save,load
@@ -156,6 +157,8 @@ if __name__=="__main__":
     # 모델 생성
     if args.model == "unet":
         model = Unet(num_classes=num_classes).to(device)
+    else:
+        model = fcn_resnet50(pretrained=False)
     params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     # 손실 함수 정의
     loss_fn = torch.nn.CrossEntropyLoss()
