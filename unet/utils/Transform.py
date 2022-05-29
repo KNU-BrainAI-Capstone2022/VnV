@@ -52,7 +52,7 @@ class Normalize(object):
 
 class Squeeze(object):
     def __call__(self, data):
-        data['target'] = data['target'].squeeze(1) # 1xHxW -> HxW
+        data['target'] = data['target'].squeeze() # 1xHxW -> HxW
         return data
 
 class transforms_train(object):
@@ -91,3 +91,15 @@ def get_transform(train=True,base_size=512,crop_size=448):
         return transforms_train(base_size=base_size,crop_size=crop_size)
     else:
         return transforms_eval(base_size=base_size)
+
+if __name__ == "__main__":
+    import numpy as np
+    a = np.random.randint(0,255,(512,512,3))
+    b = np.random.randint(0,21,(512,512,1))
+    print(a.shape)
+    print(b.shape)
+    data = {'input':a,'target':b}
+    transform = transforms_train()
+    data = transform(data)
+    print(data['input'].shape)
+    print(data['target'].shape)
