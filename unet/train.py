@@ -11,7 +11,7 @@ from models.model import Unet
 from utils.Util import make_figure,make_iou_bar,save,load
 from utils.Dataset import get_dataset
 from utils.Transform import get_transform
-from utils.Metric import IOU
+from utils.Metric import intersection_union
 
 def get_args():
     import argparse
@@ -36,8 +36,8 @@ def train_one_epoch(model,criterion,optimizer,data_loaders,lr_scheduler,epoch,be
         data_loader = data_loaders[mode]
         header = mode.upper()
         loss_arr = []
-        iou_arr = []
-
+        total_intersection = np.zeros((num_classes,))
+        total_union = np.zeros((num_classes,))
         if mode == 'train':
             writer = writer_train
             model.train()
@@ -52,10 +52,11 @@ def train_one_epoch(model,criterion,optimizer,data_loaders,lr_scheduler,epoch,be
                 optimizer.step()
                 # Metric
                 loss_arr.append(loss.item())
-                iou = IOU(outputs,targets,num_classes)
-                iou_arr.append(iou)
                 loss_mean = np.mean(loss_arr)
-                miou = np.nanmean(iou_arr)
+                intersection, union = intersection_union(outputs,targets,num_classes)
+                total_intersection += intersection
+                total_union += union
+                miou = np.nanmean(total_intersection) / np.nanmean(total_union)
                 # Result
                 line = f"{header}: EPOCH {epoch:04d} / {num_epoch:04d} | BATCH {batch:04d} / {num_batch_train:04d} | LOSS {loss_mean:.4f} | mIOU {miou:.4f}"
                 print(line)
@@ -65,9 +66,7 @@ def train_one_epoch(model,criterion,optimizer,data_loaders,lr_scheduler,epoch,be
                 writer.add_scalar('mIOU',miou,(epoch-1)*num_batch_train+batch)
         else:
             writer = writer_val
-            loss_arr,iou_arr = evaluate(model,criterion,data_loader,mode=mode)
-            loss_mean = np.mean(loss_arr)
-            miou = np.nanmean(iou_arr)
+            loss_mean,miou,fig,iou_bar = evaluate(model,criterion,data_loader,mode=mode)
             # Result
             line = f"{header}: EPOCH {epoch:04d} / {num_epoch:04d} | LOSS {loss_mean:.4f} | mIOU {miou:.4f}"
             print(line)
@@ -75,10 +74,12 @@ def train_one_epoch(model,criterion,optimizer,data_loaders,lr_scheduler,epoch,be
             # Tensorboard
             writer.add_scalar('loss',loss_mean,(epoch-1)*num_batch_train+batch)
             writer.add_scalar('mIOU',miou,(epoch-1)*num_batch_train+batch)
-            lr_scheduler.step(loss_mean)
-        # Tensorboard
-        fig = make_figure(inputs,targets,outputs,colormap)
-        iou_bar = make_iou_bar(np.nanmean(iou_arr,axis=0),classes[1:])
+            if lr_scheduler is not None:
+                lr_scheduler.step(loss_mean)
+        if mode == 'train':
+            fig = make_figure(inputs,targets,outputs,colormap)
+            iou = total_intersection / total_union
+            iou_bar = make_iou_bar(np.nan_to_num(iou[1:]),classes[1:])
         writer.add_figure('Images',fig,epoch)
         writer.add_figure('IOU',iou_bar,epoch)
     if best_miou < miou: # Best Model save
@@ -90,7 +91,8 @@ def train_one_epoch(model,criterion,optimizer,data_loaders,lr_scheduler,epoch,be
 def evaluate(model,criterion,data_loader,mode):
     model.eval()
     loss_arr=[]
-    iou_arr=[]
+    total_intersection = np.zeros((num_classes,))
+    total_union = np.zeros((num_classes,))
     with torch.no_grad():
         for data in data_loader:
             inputs, targets = data['input'].to(device), data['target'].to(device)
@@ -99,14 +101,22 @@ def evaluate(model,criterion,data_loader,mode):
             # Metric
             loss = criterion(outputs,targets.long())
             loss_arr.append(loss.item())
-            iou = IOU(outputs,targets,num_classes)
-            iou_arr.append(iou)
+            intersection, union = intersection_union(outputs,targets,num_classes)
+            total_intersection += intersection
+            total_union += union
     loss_mean = np.mean(loss_arr)
-    miou = np.nanmean(iou_arr)
+    iou = total_intersection / total_union
+    miou = np.nanmean(total_intersection) / np.nanmean(total_union) # without background
+    iou_bar = make_iou_bar(np.nan_to_num(iou[1:]),classes[1:]) # without background
+    # make figure
+    data = next(test_loader)
+    inputs, targets = data['input'], data['target']
+    outputs = model(inputs)['out']
+    fig = make_figure(inputs,targets,outputs,colormap)
     # Result
     if mode == 'test':
         print(f"TEST: LOSS {loss_mean:.4f} | mIOU {miou:.4f}")
-    return loss_arr,iou_arr
+    return loss_mean,miou,fig,iou_bar
 
 if __name__=="__main__":
     import time
@@ -148,14 +158,7 @@ if __name__=="__main__":
                     'val':DataLoader(val_ds,batch_size=batch_size,num_workers=num_workers,shuffle=False)}
     # 부수적인 Variable
     num_data_train = len(train_ds)
-    num_data_val = len(val_ds)
     num_batch_train = int(np.ceil(num_data_train/batch_size))
-    num_batch_train = int(np.ceil(num_data_val/batch_size))
-    # Tensorboard
-    writer_train = SummaryWriter(log_dir=os.path.join(log_dir,"train"))
-    writer_val = SummaryWriter(log_dir=os.path.join(log_dir,"val"))
-    # Train log
-    logfile = open(os.path.join(log_dir,"trainlog.txt"),"a")
     # 모델 생성
     if args.model == "unet":
         model = Unet(num_classes=num_classes).to(device)
@@ -175,8 +178,12 @@ if __name__=="__main__":
         lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optim,factor=0.2,patience=10)
     # Check Test-only
     if args.test_only:
+        writer_test = SummaryWriter(log_dir=os.path.join(log_dir,"test"))
         model, optim, start_epoch, best_miou = load(ckpt_dir=ckpt_dir,name="model_best.pth",net=model,optim=optim)
-        evaluate(model,loss_fn,data_loaders['val'],mode="test")
+        _,_,fig,iou_bar= evaluate(model,loss_fn,data_loaders['val'],mode="test")
+        writer_test.add_figure('Images',fig)
+        writer_test.add_figure('IOU',iou_bar)
+        writer_test.close()
         exit()
 
     # 학습하던 모델 있으면 로드
@@ -185,15 +192,20 @@ if __name__=="__main__":
     else:
         start_epoch, best_miou = 0, 0
 
+    # Tensorboard
+    writer_train = SummaryWriter(log_dir=os.path.join(log_dir,"train"))
+    writer_val = SummaryWriter(log_dir=os.path.join(log_dir,"val"))
+    # Train log
+    logfile = open(os.path.join(log_dir,"trainlog.txt"),"a")
     logfile.write("Train Start : "+str(datetime.datetime.now())+"\n")
     start_time = time.time()
     for epoch in range(start_epoch+1,num_epoch+1):
         train_one_epoch(model,loss_fn,optim,data_loaders,lr_scheduler,epoch,best_miou)
     evaluate(model,loss_fn,data_loaders['val'],'test')
     total_time = time.time() - start_time
-    writer_train.add_text("total time",str(datetime.timedelta(total_time)))
+    writer_train.add_text("total time",str(datetime.timedelta(seconds=total_time)))
     writer_train.add_text("Parameters",str(params))
-    logfile.write("Total Time : "+str(datetime.timedelta(total_time))+"\n")
+    logfile.write("Total Time : "+str(datetime.timedelta(seconds=total_time))+"\n")
     logfile.close()
     writer_train.close()
     writer_val.close()
