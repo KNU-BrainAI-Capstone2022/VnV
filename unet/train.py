@@ -46,7 +46,7 @@ def train_one_epoch(model,criterion,optimizer,data_loaders,lr_scheduler,epoch,be
                 inputs, targets = data['input'].to(device), data['target'].to(device)
                 outputs = model(inputs)['out']
 
-                loss = criterion(outputs,targets)
+                loss = criterion(outputs,targets.long())
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
@@ -97,7 +97,7 @@ def evaluate(model,criterion,data_loader,mode):
             # Forward
             outputs = model(inputs)['out']
             # Metric
-            loss = criterion(outputs,targets)
+            loss = criterion(outputs,targets.long())
             loss_arr.append(loss.item())
             iou = IOU(outputs,targets,num_classes)
             iou_arr.append(iou)
@@ -122,7 +122,6 @@ if __name__=="__main__":
         exit()
     train_dir = os.path.join(data_dir,"train")
     val_dir = os.path.join(data_dir,"val")
-    ckpt_dir = os.path.join(root_dir,"checkpoint")
     log_dir = os.path.join(root_dir,"logs")
     os.makedirs(log_dir,exist_ok=True)
     log_count = len(os.listdir(log_dir))+1
@@ -130,6 +129,7 @@ if __name__=="__main__":
         log_dir = os.path.join(log_dir,args.resume)
     else:
         log_dir = os.path.join(log_dir,f'model_{log_count}')
+    ckpt_dir = os.path.join(root_dir,"checkpoint",f'model_{log_count}')
     batch_size = args.batch_size
     num_epoch = args.epochs
     lr = args.lr
