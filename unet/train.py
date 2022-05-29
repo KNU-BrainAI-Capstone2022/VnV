@@ -30,50 +30,64 @@ def get_args():
     parser.add_argument("--test-only",help="Only test the model",action="store_true")
     return parser.parse_args()
 
-def train_one_epoch(model,criterion,optimizer,data_loader,lr_scheduler,epoch,best_miou):
+def train_one_epoch(model,criterion,optimizer,data_loaders,lr_scheduler,epoch,best_miou):
     model.train()
-    loss_arr = []
-    iou_arr = []
-    for batch, data in enumerate(data_loader,1):
-        inputs, targets = data['input'].to(device), data['target'].to(device)
-        # Forward
-        outputs = model(inputs)['out']
-        # Backward
-        optimizer.zero_grad()
-        loss = criterion(outputs,targets)
-        loss.backward()
-        optimizer.step()
-        if lr_scheduler is not None:
-            lr_scheduler.step()
-        # Metric
-        loss_arr.append(loss.item())
-        iou = IOU(outputs,targets,num_classes).tolist()
-        iou_arr.append(iou)
-        loss_mean = np.mean(loss_arr)
-        miou = np.nanmean(iou_arr)
-        # Result
-        line = f"TRAIN: EPOCH {epoch:04d} / {num_epoch:04d} | BATCH {batch:04d} / {num_batch_train:04d} | LOSS {loss_mean:.4f} | mIOU {miou:.4f}"
-        print(line)
-        logfile.write(line+"\n")
+    for mode in ['train','val']:
+        data_loader = data_loaders[mode]
+        header = mode.upper()
+        loss_arr = []
+        iou_arr = []
+
+        if mode == 'train':
+            writer = writer_train
+            model.train()
+
+            for batch, data in enumerate(data_loader,1):
+                inputs, targets = data['input'].to(device), data['target'].to(device)
+                outputs = model(inputs)['out']
+
+                loss = criterion(outputs,targets)
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+                # Metric
+                loss_arr.append(loss.item())
+                iou = IOU(outputs,targets,num_classes)
+                iou_arr.append(iou)
+                loss_mean = np.mean(loss_arr)
+                miou = np.nanmean(iou_arr)
+                # Result
+                line = f"{header}: EPOCH {epoch:04d} / {num_epoch:04d} | BATCH {batch:04d} / {num_batch_train:04d} | LOSS {loss_mean:.4f} | mIOU {miou:.4f}"
+                print(line)
+                logfile.write(line+"\n")
+                # Tensorboard
+                writer.add_scalar('loss',loss_mean,(epoch-1)*num_batch_train+batch)
+                writer.add_scalar('mIOU',miou,(epoch-1)*num_batch_train+batch)
+        else:
+            writer = writer_val
+            loss_arr,iou_arr = evaluate(model,criterion,data_loader,epoch,mode=mode)
+            loss_mean = np.mean(loss_arr)
+            miou = np.nanmean(iou_arr)
+            # Result
+            line = f"{header}: EPOCH {epoch:04d} / {num_epoch:04d} | LOSS {loss_mean:.4f} | mIOU {miou:.4f}"
+            print(line)
+            logfile.write(line+"\n")
+            # Tensorboard
+            writer.add_scalar('loss',loss_mean,(epoch-1)*num_batch_train+batch)
+            writer.add_scalar('mIOU',miou,(epoch-1)*num_batch_train+batch)
+            lr_scheduler.step(loss_mean)
         # Tensorboard
-        writer_train.add_scalar('loss',loss_mean,(epoch-1)*num_batch_train+batch)
-        writer_train.add_scalar('mIOU',miou,(epoch-1)*num_batch_train+batch)
-    if best_miou < miou:
+        fig = make_figure(inputs,targets,outputs,colormap)
+        iou_bar = make_iou_bar(np.nanmean(iou_arr,axis=0),classes[1:])
+        writer.add_figure('Images',fig,epoch)
+        writer.add_figure('IOU',iou_bar,epoch)
+    if best_miou < miou: # Best Model save
         save(ckpt_dir,model,optim,epoch,miou,"model_best.pth")
-        best_miou = miou
+        best_miou = miou # Checkpoint save
     if epoch % 30 == 0:
         save(ckpt_dir,model,optim,epoch,best_miou)
-    # Tensorboard
-    fig = make_figure(inputs,targets,outputs,colormap)
-    iou_bar = make_iou_bar(np.nanmean(iou_arr,axis=0),classes[1:])
-    writer_train.add_figure('Images',fig,epoch)
-    writer_train.add_figure('IOU',iou_bar,epoch)
 
-def evaluate(model,criterion,data_loader,epoch=1,mode="val"):
-    if mode == "val":
-        header = "VALID"
-    else:
-        header = "TEST"
+def evaluate(model,criterion,data_loader,mode):
     model.eval()
     loss_arr=[]
     iou_arr=[]
@@ -85,21 +99,14 @@ def evaluate(model,criterion,data_loader,epoch=1,mode="val"):
             # Metric
             loss = criterion(outputs,targets)
             loss_arr.append(loss.item())
-            iou = IOU(outputs,targets,num_classes).tolist()
+            iou = IOU(outputs,targets,num_classes)
             iou_arr.append(iou)
-            loss_mean = np.mean(loss_arr)
-            miou = np.nanmean(iou_arr)
-        # Result
-        line = f"{header}: LOSS {loss_mean:.4f} | mIOU {miou:.2f}"
-        print(line)
-        logfile.write(line+"\n")
-        if mode == "val":
-            writer_val.add_scalar('loss',loss_mean,(epoch-1)*num_batch_train)
-            writer_val.add_scalar('mIOU',miou,(epoch-1)*num_batch_train)
-            fig = make_figure(inputs,targets,outputs,colormap)
-            iou_bar = make_iou_bar(np.nanmean(iou_arr,axis=0),classes[1:])
-            writer_val.add_figure('Images',fig,epoch)
-            writer_val.add_figure('IOU',iou_bar,epoch)
+    loss_mean = np.mean(loss_arr)
+    miou = np.nanmean(iou_arr)
+    # Result
+    if mode == 'test':
+        print(f"TEST: LOSS {loss_mean:.4f} | mIOU {miou:.4f}")
+    return loss_arr,iou_arr
 
 if __name__=="__main__":
     import time
@@ -133,30 +140,22 @@ if __name__=="__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     # DataLoader
     train_ds, num_classes = get_dataset(data_dir,args.dataset,"train",transform=get_transform(train=True,base_size=256,crop_size=224))
-    test_ds, _ = get_dataset(data_dir,args.dataset,"val",transform=get_transform(train=False,base_size=256))
+    val_ds, _ = get_dataset(data_dir,args.dataset,"val",transform=get_transform(train=False,base_size=256))
     colormap = train_ds.colormap
     classes = train_ds.classes
 
-    train_loader = DataLoader(
-        train_ds,
-        batch_size=batch_size,
-        num_workers=num_workers,
-        shuffle=True
-        )
-    test_loader = DataLoader(
-        test_ds,
-        batch_size=batch_size,
-        num_workers=num_workers,
-        shuffle=False
-    )
+    data_loaders = {'train':DataLoader(train_ds,batch_size=batch_size,num_workers=num_workers,shuffle=True),
+                    'val':DataLoader(val_ds,batch_size=batch_size,num_workers=num_workers,shuffle=False)}
     # 부수적인 Variable
     num_data_train = len(train_ds)
+    num_data_val = len(val_ds)
     num_batch_train = int(np.ceil(num_data_train/batch_size))
+    num_batch_train = int(np.ceil(num_data_val/batch_size))
     # Tensorboard
     writer_train = SummaryWriter(log_dir=os.path.join(log_dir,"train"))
     writer_val = SummaryWriter(log_dir=os.path.join(log_dir,"val"))
     # Train log
-    logfile = open(os.path.join(log_dir,"trainlog"),"a")
+    logfile = open(os.path.join(log_dir,"trainlog.txt"),"a")
     # 모델 생성
     if args.model == "unet":
         model = Unet(num_classes=num_classes).to(device)
@@ -177,7 +176,7 @@ if __name__=="__main__":
     # Check Test-only
     if args.test_only:
         model, optim, start_epoch, best_miou = load(ckpt_dir=ckpt_dir,name="model_best.pth",net=model,optim=optim)
-        evaluate(model,loss_fn,test_loader,start_epoch,mode="Test")
+        evaluate(model,loss_fn,data_loaders['val'],start_epoch,mode="Test")
         exit()
 
     # 학습하던 모델 있으면 로드
@@ -189,8 +188,8 @@ if __name__=="__main__":
     logfile.write("Train Start : "+str(datetime.datetime.now())+"\n")
     start_time = time.time()
     for epoch in range(start_epoch+1,num_epoch+1):
-        train_one_epoch(model,loss_fn,optim,train_loader,lr_scheduler,epoch,best_miou)
-        evaluate(model,loss_fn,test_loader,epoch,"val")
+        train_one_epoch(model,loss_fn,optim,data_loaders,lr_scheduler,epoch,best_miou)
+    evaluate(model,loss_fn,data_loaders['val'],'test')
     total_time = time.time() - start_time
     writer_train.add_text("total time",str(datetime.timedelta(total_time)))
     writer_train.add_text("Parameters",str(params))
