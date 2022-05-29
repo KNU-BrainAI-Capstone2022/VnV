@@ -119,7 +119,10 @@ if __name__=="__main__":
     log_dir = os.path.join(root_dir,"logs")
     os.makedirs(log_dir,exist_ok=True)
     log_count = len(os.listdir(log_dir))+1
-    log_dir = os.path.join(log_dir,f"log{log_count}")
+    if args.resume:
+        log_dir = os.path.join(log_dir,args.resume)
+    else:
+        log_dir = os.path.join(log_dir,f'model_{log_count}')
     batch_size = args.batch_size
     num_epoch = args.epochs
     lr = args.lr
@@ -154,7 +157,6 @@ if __name__=="__main__":
     writer_val = SummaryWriter(log_dir=os.path.join(log_dir,"val"))
     # Train log
     logfile = open(os.path.join(log_dir,"trainlog"),"a")
-    logfile.write("Train Start : "+str(datetime.datetime.now())+"\n")
     # 모델 생성
     if args.model == "unet":
         model = Unet(num_classes=num_classes).to(device)
@@ -171,7 +173,7 @@ if __name__=="__main__":
         optim = torch.optim.SGD(model.parameters(),lr=lr,
                             momentum=momentum,
                             weight_decay=weight_decay)
-        lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optim,[int(0.5*num_epoch),int(0.75*num_epoch)],gamma=0.2)
+        lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optim,factor=0.2,patience=10)
     # Check Test-only
     if args.test_only:
         model, optim, start_epoch, best_miou = load(ckpt_dir=ckpt_dir,name="model_best.pth",net=model,optim=optim)
@@ -183,6 +185,8 @@ if __name__=="__main__":
         model, optim, start_epoch, best_miou = load(ckpt_dir=ckpt_dir,name=args.resume,net=model,optim=optim)
     else:
         start_epoch, best_miou = 0, 0
+
+    logfile.write("Train Start : "+str(datetime.datetime.now())+"\n")
     start_time = time.time()
     for epoch in range(start_epoch+1,num_epoch+1):
         train_one_epoch(model,loss_fn,optim,train_loader,lr_scheduler,epoch,best_miou)
