@@ -24,26 +24,6 @@ class RandomResize(object):
         data['input'] = F.resize(data['input'],[size,size],F.InterpolationMode.NEAREST)
         data['target'] = F.resize(data['target'],[size,size],F.InterpolationMode.NEAREST)
         return data
-class RandomCrop(object):
-    def __init__(self, crop_size):
-        assert isinstance(crop_size, (int, tuple))
-        if isinstance(crop_size, int):
-            self.crop_size = (crop_size, crop_size)
-        else:
-            assert len(crop_size) == 2
-            self.crop_size = crop_size
-
-    def __call__(self, data):
-        h, w = data['input'].shape[:2]
-        new_h, new_w = self.crop_size
-
-        top = np.random.randint(0, h - new_h)
-        left = np.random.randint(0, w - new_w)
-
-        data['input'] = data['input'][:,top: top + new_h,left: left + new_w]
-        data['target'] = data['target'][:,top: top + new_h,left: left + new_w]
-
-        return data
 
 class RandomHorizontalFlip(object):
     def __call__(self,data):
