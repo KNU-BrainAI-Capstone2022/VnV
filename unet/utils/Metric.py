@@ -13,7 +13,6 @@ def IOU(output:torch.Tensor,target:torch.Tensor,c:int,ignore_index=255):
     # Target shape : BxHxW long
     assert output.dim() == 4
     assert target.dim() == 3
-    eps = 1e-9 # avoid zero devision
 
     output = torch.nn.functional.softmax(output,dim=1)
     _,output = torch.max(output,dim=1) # BxCxHxW -> BxHxW

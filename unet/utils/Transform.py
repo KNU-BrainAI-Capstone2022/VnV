@@ -37,8 +37,7 @@ class ConvertImageDtype(object):
         self.dtype = dtype
 
     def __call__(self, data):
-        data['input'] = F.convert_image_dtype(data['input'], self.dtype[0])
-        data['target'] = F.convert_image_dtype(data['target'], self.dtype[1])
+        data['input'] = F.convert_image_dtype(data['input'], self.dtype)
         return data
 
 class Normalize(object):
@@ -62,7 +61,7 @@ class transforms_train(object):
             [ToTensor(),
              RandomResize(base_size),
              RandomHorizontalFlip(),
-             ConvertImageDtype([torch.float,torch.long]),
+             ConvertImageDtype(torch.float),
              Normalize(mean,std),
              Squeeze(),
             ]
@@ -77,7 +76,7 @@ class transforms_eval(object):
         transforms.extend(
             [ToTensor(),
              RandomResize(base_size),
-             ConvertImageDtype([torch.float,torch.long]),
+             ConvertImageDtype(torch.float),
              Normalize(mean,std),
              Squeeze(),
              ]
@@ -94,7 +93,7 @@ def get_transform(train=True,base_size=512,crop_size=448):
 
 if __name__ == "__main__":
     import numpy as np
-    a = np.random.randint(0,255,(512,512,3))
+    a = np.random.rand(512,512,3)
     b = np.random.randint(0,21,(512,512,1))
     print(a.shape)
     print(b.shape)

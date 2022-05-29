@@ -65,7 +65,7 @@ def train_one_epoch(model,criterion,optimizer,data_loaders,lr_scheduler,epoch,be
                 writer.add_scalar('mIOU',miou,(epoch-1)*num_batch_train+batch)
         else:
             writer = writer_val
-            loss_arr,iou_arr = evaluate(model,criterion,data_loader,epoch,mode=mode)
+            loss_arr,iou_arr = evaluate(model,criterion,data_loader,mode=mode)
             loss_mean = np.mean(loss_arr)
             miou = np.nanmean(iou_arr)
             # Result
@@ -176,7 +176,7 @@ if __name__=="__main__":
     # Check Test-only
     if args.test_only:
         model, optim, start_epoch, best_miou = load(ckpt_dir=ckpt_dir,name="model_best.pth",net=model,optim=optim)
-        evaluate(model,loss_fn,data_loaders['val'],start_epoch,mode="Test")
+        evaluate(model,loss_fn,data_loaders['val'],mode="test")
         exit()
 
     # 학습하던 모델 있으면 로드
