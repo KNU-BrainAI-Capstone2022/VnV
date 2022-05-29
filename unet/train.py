@@ -24,7 +24,7 @@ def get_args():
     parser.add_argument("--epochs", default=150, type=int, help="number of total epochs to run")
     parser.add_argument("--optim", default='sgd',choices=['sgd','adam'], type=str, help="optimizer")
     parser.add_argument("--lr", default=1e-2, type=float, help="initial learning rate")
-    parser.add_argument("--momentum", default=0.9, type=float, help="momentum")
+    parser.add_argument("--momentum", default=0.2, type=float, help="momentum")
     parser.add_argument("--weight-decay",default=1e-4,type=float,help="weight_decay")
     parser.add_argument("--resume", default="", type=str, help="path of checkpoint")
     parser.add_argument("--test-only",help="Only test the model",action="store_true")
@@ -40,7 +40,7 @@ def train_one_epoch(model,criterion,optimizer,data_loader,lr_scheduler,epoch,bes
         outputs = model(inputs)['out']
         # Backward
         optimizer.zero_grad()
-        loss = criterion(outputs,targets.type(torch.long))
+        loss = criterion(outputs,targets)
         loss.backward()
         optimizer.step()
         if lr_scheduler is not None:
@@ -79,11 +79,11 @@ def evaluate(model,criterion,data_loader,epoch=1,mode="val"):
     iou_arr=[]
     with torch.no_grad():
         for data in data_loader:
-            inputs, targets = data['input'].to(device), data['target'].squeeze(1).to(device)
+            inputs, targets = data['input'].to(device), data['target'].to(device)
             # Forward
             outputs = model(inputs)['out']
             # Metric
-            loss = criterion(outputs,targets.type(torch.long))
+            loss = criterion(outputs,targets)
             loss_arr.append(loss.item())
             iou = IOU(outputs,targets,num_classes).tolist()
             iou_arr.append(iou)

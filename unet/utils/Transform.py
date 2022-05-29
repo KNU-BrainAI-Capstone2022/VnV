@@ -33,8 +33,8 @@ class RandomHorizontalFlip(object):
         return data
 
 class ConvertImageDtype(object):
-    def __init__(self, dtypes:list):
-        self.dtypes = dtypes
+    def __init__(self, dtype:list):
+        self.dtype = dtype
 
     def __call__(self, data):
         data['input'] = F.convert_image_dtype(data['input'], self.dtype[0])
