@@ -33,11 +33,12 @@ class RandomHorizontalFlip(object):
         return data
 
 class ConvertImageDtype(object):
-    def __init__(self, dtype):
-        self.dtype = dtype
+    def __init__(self, dtypes:list):
+        self.dtypes = dtypes
 
     def __call__(self, data):
-        data['input'] = F.convert_image_dtype(data['input'], self.dtype)
+        data['input'] = F.convert_image_dtype(data['input'], self.dtype[0])
+        data['target'] = F.convert_image_dtype(data['target'], self.dtype[1])
         return data
 
 class Normalize(object):
@@ -49,6 +50,11 @@ class Normalize(object):
         data['input'] = F.normalize(data['input'], mean=self.mean, std=self.std)
         return data
 
+class Squeeze(object):
+    def __call__(self, data):
+        data['target'] = data['target'].squeeze(1) # 1xHxW -> HxW
+        return data
+
 class transforms_train(object):
     def __init__(self,base_size=256,crop_size=224,mean=(0.485,0.456,0.406),std=(0.229,0.224,0.225)):
         transforms = []
@@ -56,8 +62,9 @@ class transforms_train(object):
             [ToTensor(),
              RandomResize(base_size),
              RandomHorizontalFlip(),
-             ConvertImageDtype(torch.float),
-             Normalize(mean,std)
+             ConvertImageDtype([torch.float,torch.long]),
+             Normalize(mean,std),
+             Squeeze(),
             ]
         )
         self.transforms = Compose(transforms)
@@ -70,8 +77,10 @@ class transforms_eval(object):
         transforms.extend(
             [ToTensor(),
              RandomResize(base_size),
-             ConvertImageDtype(torch.float),
-             Normalize(mean,std)]
+             ConvertImageDtype([torch.float,torch.long]),
+             Normalize(mean,std),
+             Squeeze(),
+             ]
         )
         self.transforms = Compose(transforms)
     def __call__(self,data):

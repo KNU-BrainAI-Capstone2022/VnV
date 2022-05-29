@@ -8,13 +8,16 @@ def label_to_one_hot_label(labels:torch.Tensor,num_classes:int,ignore_index=255)
     one_hot.scatter_(1,labels.unsqueeze(1),1.0)
     return one_hot
 
-def IOU(output:torch.Tensor,target:torch.Tensor,c:int):
+def IOU(output:torch.Tensor,target:torch.Tensor,c:int,ignore_index=255):
     # output shape : BxCxHxW float
-    # Target shape : BxHxW int
+    # Target shape : BxHxW long
     assert output.dim() == 4
     assert target.dim() == 3
+    eps = 1e-9 # avoid zero devision
+
     output = torch.nn.functional.softmax(output,dim=1)
-    _,output = torch.max(output,dim=1)
+    _,output = torch.max(output,dim=1) # BxCxHxW -> BxHxW
+
     output = output.contiguous().view(-1).type(torch.float)
     target = target.contiguous().view(-1).type(torch.float)
     intersection = output[output==target]
@@ -24,4 +27,4 @@ def IOU(output:torch.Tensor,target:torch.Tensor,c:int):
     area_target = torch.histc(target,bins=c,min=0,max=c-1)[1:]
     area_union = area_output + area_target - area_intersection
     iou = area_intersection / area_union
-    return iou
+    return iou.tolist()

@@ -35,7 +35,7 @@ def train_one_epoch(model,criterion,optimizer,data_loader,lr_scheduler,epoch,bes
     loss_arr = []
     iou_arr = []
     for batch, data in enumerate(data_loader,1):
-        inputs, targets = data['input'].to(device), data['target'].squeeze(1).to(device)
+        inputs, targets = data['input'].to(device), data['target'].to(device)
         # Forward
         outputs = model(inputs)['out']
         # Backward
@@ -162,7 +162,7 @@ if __name__=="__main__":
         model = fcn_resnet50(pretrained=False).to(device)
     params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     # 손실 함수 정의
-    loss_fn = torch.nn.CrossEntropyLoss()
+    loss_fn = torch.nn.CrossEntropyLoss(ignore_index=255)
     # 옵티마이저 정의
     if args.optim == 'adam':
         optim = torch.optim.Adam(model.parameters(),lr=lr)

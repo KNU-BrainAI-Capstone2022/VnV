@@ -75,10 +75,10 @@ class CustomVOCSegmentation(torch.utils.data.Dataset):
 
         input = np.array(input)
         target = np.array(target)
-
+        
+        input = input / 255 # [0,255] -> [0.,1.]
         if target.ndim == 2: # HxW -> CxHxW
             target = np.expand_dims(target,axis=-1)
-        target[target>=len(self.classes)] = 0 # 경계는 제거
 
         data = {'input':input,'target':target}
         if self.transform is not None:
