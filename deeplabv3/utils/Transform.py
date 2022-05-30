@@ -25,6 +25,27 @@ class RandomResize(object):
         data['target'] = F.resize(data['target'],[size,size],F.InterpolationMode.NEAREST)
         return data
 
+class RandomCrop(object):
+    def __init__(self, crop_size):
+        assert isinstance(crop_size, (int, tuple))
+        if isinstance(crop_size, int):
+            self.crop_size = (crop_size, crop_size)
+        else:
+            assert len(crop_size) == 2
+            self.crop_size = crop_size
+
+    def __call__(self, data):
+        h, w = data['input'].shape[-2:]
+        new_h, new_w = self.crop_size
+
+        top = random.randint(0, h - new_h)
+        left = random.randint(0, w - new_w)
+
+        data['input'] = data['input'][:,top: top + new_h,left: left + new_w]
+        data['target'] = data['target'][:,top: top + new_h,left: left + new_w]
+
+        return data
+
 class RandomHorizontalFlip(object):
     def __call__(self,data):
         if random.random() > 0.5:
@@ -60,6 +81,7 @@ class transforms_train(object):
         transforms.extend(
             [ToTensor(),
              RandomResize(base_size),
+             RandomCrop(crop_size),
              RandomHorizontalFlip(),
              ConvertImageDtype(torch.float),
              Normalize(mean,std),

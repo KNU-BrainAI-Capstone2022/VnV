@@ -21,6 +21,7 @@ def get_args():
     parser.add_argument("--model", default="unet", type=str, help="model name")
     parser.add_argument("-j", "--num_workers", default=0, type=int, help="number of data loading workers (default: 0)")
     parser.add_argument("-b", "--batch-size", default=8, type=int, help="images per gpu")
+    parser.add_argument("--image-size", default=512, type=int, help="input image size")
     parser.add_argument("--epochs", default=150, type=int, help="number of total epochs to run")
     parser.add_argument("--optim", default='sgd',choices=['sgd','adam'], type=str, help="optimizer")
     parser.add_argument("--lr", default=1e-2, type=float, help="initial learning rate")
@@ -28,6 +29,7 @@ def get_args():
     parser.add_argument("--weight-decay",default=1e-4,type=float,help="weight_decay")
     parser.add_argument("--resume", default="", type=str, help="path of checkpoint")
     parser.add_argument("--test-only",help="Only test the model",action="store_true")
+    parser.add_argument("--test-model",help="test model select",required="--test-only")
     return parser.parse_args()
 
 def train_one_epoch(model,criterion,optimizer,data_loaders,lr_scheduler,epoch,best_miou):
@@ -56,7 +58,7 @@ def train_one_epoch(model,criterion,optimizer,data_loaders,lr_scheduler,epoch,be
                 intersection, union = intersection_union(outputs,targets,num_classes)
                 total_intersection += intersection
                 total_union += union
-                miou = np.nanmean(total_intersection) / np.nanmean(total_union)
+                miou = np.nanmean(total_intersection[1:]) / np.nanmean(total_union[1:])
                 # Result
                 line = f"{header}: EPOCH {epoch:04d} / {num_epoch:04d} | BATCH {batch:04d} / {num_batch_train:04d} | LOSS {loss_mean:.4f} | mIOU {miou:.4f}"
                 print(line)
@@ -106,16 +108,13 @@ def evaluate(model,criterion,data_loader,mode):
             total_union += union
     loss_mean = np.mean(loss_arr)
     iou = total_intersection / total_union
-    miou = np.nanmean(total_intersection) / np.nanmean(total_union) # without background
+    miou = np.nanmean(total_intersection[1:]) / np.nanmean(total_union[1:])
     iou_bar = make_iou_bar(np.nan_to_num(iou[1:]),classes[1:]) # without background
     # make figure
-    data = next(test_loader)
-    inputs, targets = data['input'], data['target']
+    data = next(iter(data_loader))
+    inputs, targets = data['input'].to(device), data['target'].to(device)
     outputs = model(inputs)['out']
-    fig = make_figure(inputs,targets,outputs,colormap)
-    # Result
-    if mode == 'test':
-        print(f"TEST: LOSS {loss_mean:.4f} | mIOU {miou:.4f}")
+    fig = make_figure(inputs.detach().cpu(),targets.detach().cpu(),outputs.detach().cpu(),colormap)
     return loss_mean,miou,fig,iou_bar
 
 if __name__=="__main__":
@@ -137,9 +136,12 @@ if __name__=="__main__":
     log_count = len(os.listdir(log_dir))+1
     if args.resume:
         log_dir = os.path.join(log_dir,args.resume)
+        ckpt_dir = os.path.join(root_dir,"checkpoint",args.resume)
     else:
         log_dir = os.path.join(log_dir,f'model_{log_count}')
-    ckpt_dir = os.path.join(root_dir,"checkpoint",f'model_{log_count}')
+        ckpt_dir = os.path.join(root_dir,"checkpoint",f'model_{log_count}')
+    if args.test_only:
+        ckpt_dir = os.path.join(root_dir,"checkpoint",args.test_model)
     batch_size = args.batch_size
     num_epoch = args.epochs
     lr = args.lr
@@ -149,8 +151,8 @@ if __name__=="__main__":
     # GPU
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     # DataLoader
-    train_ds, num_classes = get_dataset(data_dir,args.dataset,"train",transform=get_transform(train=True,base_size=256,crop_size=224))
-    val_ds, _ = get_dataset(data_dir,args.dataset,"val",transform=get_transform(train=False,base_size=256))
+    train_ds, num_classes = get_dataset(data_dir,args.dataset,"train",transform=get_transform(train=True,base_size=args.image_size,crop_size=int(args.image_size*0.875)))
+    val_ds, _ = get_dataset(data_dir,args.dataset,"val",transform=get_transform(train=False,base_size=args.image_size))
     colormap = train_ds.colormap
     classes = train_ds.classes
 
@@ -178,9 +180,13 @@ if __name__=="__main__":
         lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optim,factor=0.2,patience=10)
     # Check Test-only
     if args.test_only:
+        start=time.time()
         writer_test = SummaryWriter(log_dir=os.path.join(log_dir,"test"))
-        model, optim, start_epoch, best_miou = load(ckpt_dir=ckpt_dir,name="model_best.pth",net=model,optim=optim)
-        _,_,fig,iou_bar= evaluate(model,loss_fn,data_loaders['val'],mode="test")
+        model, optim, start_epoch, best_miou = load(ckpt_dir=ckpt_dir,model=model,optim=optim,name="model_best.pth")
+        loss_mean,miou,fig,iou_bar= evaluate(model,loss_fn,data_loaders['val'],mode="test")
+        print(f"TEST: LOSS {loss_mean:.4f} | mIOU {miou:.4f}")
+        end = time.time()
+        print(f"Average Inference Time : {(end-start)/len(val_ds)}")
         writer_test.add_figure('Images',fig)
         writer_test.add_figure('IOU',iou_bar)
         writer_test.close()

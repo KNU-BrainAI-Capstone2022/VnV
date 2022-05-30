@@ -176,7 +176,10 @@ if __name__=="__main__":
     # Check Test-only
     if args.test_only:
         model, optim, start_epoch, best_miou = load(ckpt_dir=ckpt_dir,name="model_best.pth",net=model,optim=optim)
+        start = time.time()
         evaluate(model,loss_fn,data_loaders['val'],mode="test")
+        total = time.time()-start
+        print()
         exit()
 
     # 학습하던 모델 있으면 로드
