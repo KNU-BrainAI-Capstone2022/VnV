@@ -99,3 +99,180 @@ class Unet(nn.Module):
         x = self.fc(dec1_1)
         output={'out':x}
         return output
+
+class FCN8(nn.Module):
+    # vgg 16 
+    def __init__(self,pretrained_net,num_class=21):
+        super(FCN8, self).__init__()
+        self.pretrained_net = pretrained_net.features
+
+        self.fc1 = nn.Conv2d(in_channels=512,out_channels=4096,kernel_size=1)
+        self.fc2 = nn.Conv2d(4096,4096,kernel_size=1)
+        self.fc3 = nn.Conv2d(4096,num_class,kernel_size=1)
+        self.pool4_conv = nn.Conv2d(512,21,kernel_size=1)
+        self.pool3_conv = nn.Conv2d(256,21,kernel_size=1)
+
+        self.upsample2 = nn.ConvTranspose2d(num_class,num_class,2,2,bias=False)
+        self.pool4_upsample2 = nn.ConvTranspose2d(num_class,num_class,2,2,bias=False)
+        self.upsample8 = nn.ConvTranspose2d(num_class,num_class,8,8,bias=False)
+
+
+        self.relu    = nn.ReLU(inplace=True)
+        self.dropout = nn.Dropout2d(0.5)
+
+    def forward(self, x):
+        pool3 = self.pretrained_net[:-14](x)
+        pool4 = self.pretrained_net[-14:-7](pool3)
+        pool5 = self.pretrained_net[-7:](pool4)
+
+        pool5 = self.fc1(pool5)
+        pool5 = self.relu(pool5)
+        pool5 = self.dropout(pool5)
+        pool5 = self.fc2(pool5)
+        pool5 = self.relu(pool5)
+        pool5 = self.dropout(pool5)
+        pool5 = self.fc3(pool5)
+
+        # 1/32 *2 + 1/16
+        pool5 = self.upsample2(pool5)
+        pool4 = self.pool4_conv(pool4)
+        x = pool5 + pool4
+        
+        # 1/16 *2 + 1/8
+        x = self.pool4_upsample2(x)
+        pool3 = self.pool3_conv(pool3)
+        x = x + pool3
+        
+        # 1/8 * 8 
+        x = self.upsample8(x)
+        return x 
+
+    def _initialize_weights(self):
+            for m in self.modules():
+                if isinstance(m, nn.Conv2d):
+                    m.weight.data.zero_()
+                    if m.bias is not None:
+                        m.bias.data.zero_()
+    # def make_block(self, in_channel, out_channel, repeat):
+    #     layers = []
+    #     for i in range(repeat):
+    #         if (i==0):
+    #             layers.append(nn.Conv2d(in_channel, out_channel, kernel_size=3, padding=1, stride=1))
+    #         else:
+    #             layers.append(nn.Conv2d(out_channel,out_channel,kernel_size=3, padding=1, stride=1))
+    #         layers.append(nn.BatchNorm2d(out_channel))
+    #         layers.append(nn.ReLU())
+    #     layers.append(nn.MaxPool2d(kernel_size=2, stride=2))
+    #     block = nn.Sequential(*layers)
+
+    #     return block
+
+class FCN16(nn.Module):
+    # vgg 16 
+    def __init__(self,pretrained_net,num_class=21):
+        super(FCN16, self).__init__()
+        self.pretrained_net = pretrained_net.features
+
+        self.fc1 = nn.Conv2d(in_channels=512,out_channels=4096,kernel_size=1)
+        self.fc2 = nn.Conv2d(4096,4096,kernel_size=1)
+        self.fc3 = nn.Conv2d(4096,num_class,kernel_size=1)
+        self.pool4_conv = nn.Conv2d(512,21,kernel_size=1)
+
+        self.upsample2 = nn.ConvTranspose2d(num_class, num_class,2,2,bias=False)
+        self.upsample16 = nn.ConvTranspose2d(num_class,num_class,16,16,bias=False)
+
+        self.relu    = nn.ReLU(inplace=True)
+        self.dropout = nn.Dropout2d(0.5)
+        #self._initialize_weights()
+    def forward(self, x):
+        pool4 = self.pretrained_net[:-7](x)
+        pool5 = self.pretrained_net[-7:](pool4)
+
+        pool5 = self.fc1(pool5)
+        pool5 = self.relu(True)(pool5)
+        pool5 = self.dropout(0.5)(pool5)
+        pool5 = self.fc2(pool5)
+        pool5 = self.relu(True)(pool5)
+        pool5 = self.dropout(0.5)(pool5)
+        pool5 = self.fc3(pool5)
+
+        pool5 = self.upsample2(pool5)
+        pool4 = self.pool4_conv(pool4)
+        x = pool5 + pool4
+        x = self.upsample16(x)
+
+        return x
+    def _initialize_weights(self):
+            for m in self.modules():
+                if isinstance(m, nn.Conv2d):
+                    m.weight.data.zero_()
+                    if m.bias is not None:
+                        m.bias.data.zero_()
+    # def make_block(self, in_channel, out_channel, repeat):
+    #     layers = []
+    #     for i in range(repeat):
+    #         if (i==0):
+    #             layers.append(nn.Conv2d(in_channel, out_channel, kernel_size=3, padding=1, stride=1))
+    #         else:
+    #             layers.append(nn.Conv2d(out_channel,out_channel,kernel_size=3, padding=1, stride=1))
+    #         layers.append(nn.BatchNorm2d(out_channel))
+    #         layers.append(self.relu())
+    #     layers.append(nn.MaxPool2d(kernel_size=2, stride=2))
+    #     block = nn.Sequential(*layers)
+
+    #     return block
+
+class FCN32(nn.Module):
+    # vgg 16 
+    def __init__(self,pretrained_net,num_class=21):
+        super(FCN32, self).__init__()
+        self.pretrained_net = pretrained_net.features
+        # self.conv1 = self.make_block(in_channel=3, out_channel=64,repeat=2)
+        # self.conv2 = self.make_block(in_channel=64,out_channel=128,repeat=2)
+        # self.conv3 = self.make_block(128,256,3)
+        # self.conv4 = self.make_block(256,512,3)
+        # self.conv5 = self.make_block(512,512,3)
+
+        self.fc1 = nn.Conv2d(in_channels=512,out_channels=4096,kernel_size=1)
+        self.fc2 = nn.Conv2d(4096,4096,kernel_size=1)
+        self.fc3 = nn.Conv2d(4096,num_class,kernel_size=1)
+
+        self.upsample32 = nn.ConvTranspose2d(in_channels=num_class,out_channels=num_class,kernel_size=32,stride=32,bias=False)
+
+        self.relu    = nn.ReLU(inplace=True)
+        self.dropout = nn.Dropout2d(0.5)
+        #self._initialize_weights()
+
+    def forward(self, x):
+
+        x = self.pretrained_net(x)
+        x = self.fc1(x)
+        x = self.relu(x)
+        x = self.dropout(x)
+        x = self.fc2(x)
+        x = self.relu(x)
+        x = self.dropout(x)
+        x = self.fc3(x)
+        x = self.upsample32(x)
+
+        return x
+    # def _initialize_weights(self):
+    #     for m in self.modules():
+    #         print(m)
+    #         if isinstance(m, nn.Conv2d):
+    #             m.weight.data.zero_()
+    #             if m.bias is not None:
+    #                 m.bias.data.zero_()
+    # def make_block(self, in_channel, out_channel, repeat):
+    #     layers = []
+    #     for i in range(repeat):
+    #         if (i==0):
+    #             layers.append(nn.Conv2d(in_channel, out_channel, kernel_size=3, padding=1, stride=1))
+    #         else:
+    #             layers.append(nn.Conv2d(out_channel,out_channel,kernel_size=3, padding=1, stride=1))
+    #         layers.append(nn.BatchNorm2d(out_channel))
+    #         layers.append(nn.ReLU())
+    #     layers.append(nn.MaxPool2d(kernel_size=2, stride=2))
+    #     block = nn.Sequential(*layers)
+
+    #     return block
