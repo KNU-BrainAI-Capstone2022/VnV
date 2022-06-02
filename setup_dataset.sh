@@ -27,9 +27,6 @@ elif [ $2 == 'cityscapes' ]; then
     if [ -e 'index.html' ]; then
         rm index.html
     fi
-    if [ -e 'cookies.txt' ]; then
-        rm cookies.txt
-    fi
     if [ -e 'license.txt' ]; then
         rm license.txt
     fi
@@ -43,14 +40,14 @@ elif [ $2 == 'cityscapes' ]; then
     if [ -e 'index.html' ]; then
         rm index.html
     fi
-    if [ -e 'cookies.txt' ]; then
-        rm cookies.txt
-    fi
     if [ -e 'license.txt' ]; then
         rm license.txt
     fi
     if [ -e 'README' ]; then
         rm README
+    fi
+    if [ -e 'cookies.txt' ]; then
+        rm cookies.txt
     fi
     rm gtFine_trainvaltest.zip
 else

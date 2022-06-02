@@ -5,7 +5,7 @@
 bash setup_dataset.sh [data_dir] [dataset : {voc2012,cityscapes}]
 ```
 ## Train model
-```bash
+```
 python train.py -h
 usage: train.py [-h] [--dataset DATASET] [--model MODEL] [-j NUM_WORKERS] [-b BATCH_SIZE] [--image-size IMAGE_SIZE] [--epochs EPOCHS] [--optim {sgd,adam}]
                 [--lr LR] [--momentum MOMENTUM] [--weight-decay WEIGHT_DECAY] [--resume RESUME] [--test-only] [--test-model TEST_MODEL]
