@@ -1,13 +1,13 @@
 import torch
 import numpy as np
 
-def label_to_one_hot_label(labels:torch.Tensor,num_classes:int,ignore_index=255):
-    # BxHxW -> BxCxHxW
-    shape = labels.shape
-    labels[labels==ignore_index] = 0 # Ignore index 제거
-    one_hot = torch.zeros((shape[0],num_classes)+shape[1:],dtype=torch.float32)
-    one_hot.scatter_(1,labels.unsqueeze(1),1.0)
-    return one_hot
+# def label_to_one_hot_label(labels:torch.Tensor,num_classes:int,ignore_index=255):
+#     # BxHxW -> BxCxHxW
+#     shape = labels.shape
+#     labels[labels==ignore_index] = 0 # Ignore index 제거
+#     one_hot = torch.zeros((shape[0],num_classes)+shape[1:],dtype=torch.float32)
+#     one_hot.scatter_(1,labels.unsqueeze(1),1.0)
+#     return one_hot
 
 def intersection_union(output:torch.Tensor,target:torch.Tensor,c:int,ignore_index=255):
     # output shape : BxCxHxW float

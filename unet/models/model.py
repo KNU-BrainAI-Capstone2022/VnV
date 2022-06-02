@@ -6,7 +6,7 @@ class Unet(nn.Module):
     def __init__(self,num_classes=21): # Pascal VOC 2012
         super(Unet,self).__init__()
         
-        def CBR2D(in_c,out_c,k=3,s=1,padding=1,bias=True):
+        def CBR2D(in_c,out_c,k=3,s=1,padding=1,bias=False):
             block = nn.Sequential(nn.Conv2d(in_channels=in_c,out_channels=out_c,
                                             kernel_size=k,stride=s,padding=padding,bias=bias),
                                   nn.BatchNorm2d(num_features=out_c),
@@ -34,27 +34,27 @@ class Unet(nn.Module):
         self.dec5_1 = CBR2D(in_c=1024,out_c=512)
 
         self.unpool4 = nn.ConvTranspose2d(in_channels=512,out_channels=512,
-                                          kernel_size=2,stride=2,padding=0,bias=True)
+                                          kernel_size=2,stride=2,padding=0,bias=False)
         self.dec4_2 = CBR2D(in_c=2*512,out_c=512)
         self.dec4_1 = CBR2D(in_c=512,out_c=256)
         
         self.unpool3 = nn.ConvTranspose2d(in_channels=256,out_channels=256,
-                                          kernel_size=2,stride=2,padding=0,bias=True)
+                                          kernel_size=2,stride=2,padding=0,bias=False)
         self.dec3_2 = CBR2D(in_c=2*256,out_c=256)
         self.dec3_1 = CBR2D(in_c=256,out_c=128)
         
         self.unpool2 = nn.ConvTranspose2d(in_channels=128,out_channels=128,
-                                          kernel_size=2,stride=2,padding=0,bias=True)
+                                          kernel_size=2,stride=2,padding=0,bias=False)
         self.dec2_2 = CBR2D(in_c=2*128,out_c=128)
         self.dec2_1 = CBR2D(in_c=128,out_c=64)
         
         self.unpool1 = nn.ConvTranspose2d(in_channels=64,out_channels=64,
-                                          kernel_size=2,stride=2,padding=0,bias=True)
+                                          kernel_size=2,stride=2,padding=0,bias=False)
         self.dec1_2 = CBR2D(in_c=2*64,out_c=64)
         self.dec1_1 = CBR2D(in_c=64,out_c=64)
         
         self.fc = nn.Conv2d(in_channels=64,out_channels=num_classes,
-                            kernel_size=1,stride=1,padding=0,bias=True)
+                            kernel_size=1,stride=1,padding=0,bias=False)
     
     def forward(self, x):
         enc1_1 = self.enc1_1(x)

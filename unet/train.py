@@ -29,7 +29,7 @@ def get_args():
     parser.add_argument("--weight-decay",default=1e-4,type=float,help="weight_decay")
     parser.add_argument("--resume", default="", type=str, help="path of checkpoint")
     parser.add_argument("--test-only",help="Only test the model",action="store_true")
-    parser.add_argument("--test-model",help="test model select",required="--test-only")
+    parser.add_argument("--test-model",help="test model select",required=False)
     return parser.parse_args()
 
 def train_one_epoch(model,criterion,optimizer,data_loaders,lr_scheduler,epoch,best_miou):
@@ -84,7 +84,7 @@ def train_one_epoch(model,criterion,optimizer,data_loaders,lr_scheduler,epoch,be
             iou_bar = make_iou_bar(np.nan_to_num(iou[1:]),classes[1:])
         writer.add_figure('Images',fig,epoch)
         writer.add_figure('IOU',iou_bar,epoch)
-    if best_miou < miou: # Best Model save
+    if mode == 'val' and best_miou < miou: # Best Model save
         save(ckpt_dir,model,optim,epoch,miou,"model_best.pth")
         best_miou = miou # Checkpoint save
     if epoch % 30 == 0:
