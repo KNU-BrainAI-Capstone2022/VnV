@@ -1,1 +1,5 @@
 dataset
+checkpoint
+logs
+__pycache__
+practice.ipynb
