@@ -50,6 +50,22 @@ elif [ $2 == 'cityscapes' ]; then
         rm cookies.txt
     fi
     rm gtFine_trainvaltest.zip
+elif [ $2 == 'cityscapes_pair' ]; then
+    echo "Setup Cityscapes_pair Dataset"
+    echo "pair image size : 256x512"
+    if [ $(which python) ] && [ $(which pip) ]; then
+        echo "If kaggle is not installed on the pip, the kaggle package is installed."
+        echo -e "The kaggle.json file must be located under ~/.kaggle (based on Unix-based).\nOtherwise, obtain the token from the account on the kaggle homepage through Create New API Token and move it to the ~/.kaggle location."
+        python -m pip install kaggle
+        kaggle datasets download -d dansbecker/cityscapes-image-pairs
+        unzip cityscapes-image-pairs.zip
+        rm cityscapes-image-pairs.zip
+        mv cityscapes_data cityscapes_pair
+        cd cityscapes_pair
+        rm -rf cityscapes_data
+    else
+        echo "You must have python and pip installed."
+    fi
 else
-    echo "dataset choice : {voc2012,cityscapes}"
+    echo "dataset choice : {voc2012,cityscapes,cityscapes_pair}"
 fi
