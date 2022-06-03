@@ -13,16 +13,19 @@ class ToTensor(object):
 
         return data
 
-class RandomResize(object):
-    def __init__(self,min_size,max_size=None):
+class Resize(object):
+    def __init__(self,base_size):
+        assert isinstance(base_size, (int, tuple))
         self.min_size = min_size
-        if max_size is None:
-            max_size = min_size
-        self.max_size = max_size
-    def __call__(self,data):
+        if isinstance(base_size, int):
+            self.base_size = (base_size, base_size)
+        else:
+            assert len(base_size) == 2
+            self.base_size = base_size
+    def __call__(self, data):
         size = random.randint(self.min_size,self.max_size)
-        data['image'] = F.resize(data['image'],[size,size],F.InterpolationMode.NEAREST)
-        data['target'] = F.resize(data['target'],[size,size],F.InterpolationMode.NEAREST)
+        data['image'] = F.resize(data['image'],base_size,F.InterpolationMode.NEAREST)
+        data['target'] = F.resize(data['target'],base_size,F.InterpolationMode.NEAREST)
         return data
 
 class RandomCrop(object):
@@ -76,11 +79,16 @@ class Squeeze(object):
         return data
 
 class transforms_train(object):
-    def __init__(self,base_size=256,crop_size=224,mean=(0.485,0.456,0.406),std=(0.229,0.224,0.225)):
+    def __init__(self,dataset):
         transforms = []
+        tfs = {
+            'voc2012':(512,448,(0.485,0.456,0.406),(0.229,0.224,0.225)),
+            'cityscapes':((1024,2048),None,(0.485,0.456,0.406),(0.229,0.224,0.225)
+            }
+        base_size,crop_size,mean,std = tfs[dataset]
         transforms.extend(
             [ToTensor(),
-             RandomResize(base_size),
+             Resize(base_size),
              RandomCrop(crop_size),
              RandomHorizontalFlip(),
              ConvertImageDtype(torch.float),
@@ -93,11 +101,16 @@ class transforms_train(object):
         return self.transforms(data)
 
 class transforms_eval(object):
-    def __init__(self,base_size=256,mean=(0.485,0.456,0.406),std=(0.229,0.224,0.225)):
+    def __init__(self,dataset):
         transforms = []
+        dict_tf = {
+            'voc2012':(512,448,(0.485,0.456,0.406),(0.229,0.224,0.225)),
+            'cityscapes':((1024,2048),None,(0.485,0.456,0.406),(0.229,0.224,0.225)
+            }
+        base_size,crop_size,mean,std = dict_tf[dataset]
         transforms.extend(
             [ToTensor(),
-             RandomResize(base_size),
+             Resize(base_size),
              ConvertImageDtype(torch.float),
              Normalize(mean,std),
              Squeeze(),
@@ -107,11 +120,11 @@ class transforms_eval(object):
     def __call__(self,data):
         return self.transforms(data)
 
-def get_transform(train=True,base_size=512,crop_size=448):
+def get_transform(dataset,train=True):
     if train:
-        return transforms_train(base_size=base_size,crop_size=crop_size)
+        return transforms_train(dataset)
     else:
-        return transforms_eval(base_size=base_size)
+        return transforms_eval(dataset)
 
 if __name__ == "__main__":
     import numpy as np

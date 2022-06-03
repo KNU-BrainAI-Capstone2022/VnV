@@ -97,8 +97,7 @@ class Unet(nn.Module):
         dec1_1 = self.dec1_1(dec1_2)
         
         x = self.fc(dec1_1)
-        output={'out':x}
-        return output
+        return x
 
 class FCN8(nn.Module):
     # vgg 16 
@@ -276,3 +275,6 @@ class FCN32(nn.Module):
     #     block = nn.Sequential(*layers)
 
     #     return block
+
+def get_model(model_name,num_classes):
+    return locals()[model_name](num_classes)
