@@ -5,10 +5,10 @@ from torchvision.transforms import Compose
 
 class ToTensor(object):
     def __call__(self, data):
-        data['input'] = data['input'].transpose((2,0,1))
+        data['image'] = data['image'].transpose((2,0,1))
         data['target'] = data['target'].transpose((2,0,1))
 
-        data['input'] = torch.from_numpy(data['input'])
+        data['image'] = torch.from_numpy(data['image'])
         data['target'] = torch.from_numpy(data['target'])
 
         return data
@@ -21,7 +21,7 @@ class RandomResize(object):
         self.max_size = max_size
     def __call__(self,data):
         size = random.randint(self.min_size,self.max_size)
-        data['input'] = F.resize(data['input'],[size,size],F.InterpolationMode.NEAREST)
+        data['image'] = F.resize(data['image'],[size,size],F.InterpolationMode.NEAREST)
         data['target'] = F.resize(data['target'],[size,size],F.InterpolationMode.NEAREST)
         return data
 
@@ -35,13 +35,13 @@ class RandomCrop(object):
             self.crop_size = crop_size
 
     def __call__(self, data):
-        h, w = data['input'].shape[-2:]
+        h, w = data['image'].shape[-2:]
         new_h, new_w = self.crop_size
 
         top = random.randint(0, h - new_h)
         left = random.randint(0, w - new_w)
 
-        data['input'] = data['input'][:,top: top + new_h,left: left + new_w]
+        data['image'] = data['image'][:,top: top + new_h,left: left + new_w]
         data['target'] = data['target'][:,top: top + new_h,left: left + new_w]
 
         return data
@@ -49,7 +49,7 @@ class RandomCrop(object):
 class RandomHorizontalFlip(object):
     def __call__(self,data):
         if random.random() > 0.5:
-            data['input'] = F.hflip(data['input'])
+            data['image'] = F.hflip(data['image'])
             data['target'] = F.hflip(data['target'])
         return data
 
@@ -58,7 +58,7 @@ class ConvertImageDtype(object):
         self.dtype = dtype
 
     def __call__(self, data):
-        data['input'] = F.convert_image_dtype(data['input'], self.dtype)
+        data['image'] = F.convert_image_dtype(data['image'], self.dtype)
         return data
 
 class Normalize(object):
@@ -67,7 +67,7 @@ class Normalize(object):
         self.std = std
 
     def __call__(self, data):
-        data['input'] = F.normalize(data['input'], mean=self.mean, std=self.std)
+        data['image'] = F.normalize(data['image'], mean=self.mean, std=self.std)
         return data
 
 class Squeeze(object):
@@ -119,8 +119,8 @@ if __name__ == "__main__":
     b = np.random.randint(0,21,(512,512,1))
     print(a.shape)
     print(b.shape)
-    data = {'input':a,'target':b}
+    data = {'image':a,'target':b}
     transform = transforms_train()
     data = transform(data)
-    print(data['input'].shape)
+    print(data['image'].shape)
     print(data['target'].shape)
