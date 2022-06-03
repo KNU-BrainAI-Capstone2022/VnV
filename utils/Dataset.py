@@ -5,7 +5,7 @@ from PIL import Image
 import torch
 
 class CustomVOCSegmentation(torch.utils.data.Dataset):
-    classes = [
+    self._classes = [
         "background",
         "aeroplane",
         "bicycle",
@@ -29,8 +29,7 @@ class CustomVOCSegmentation(torch.utils.data.Dataset):
         "tv/monitor",
     ]
 
-
-    colormap = [
+    self._cmap = [
         [0, 0, 0],
         [128, 0, 0],
         [0, 128, 0],
@@ -53,6 +52,8 @@ class CustomVOCSegmentation(torch.utils.data.Dataset):
         [128, 192, 0],
         [0, 64, 128],
     ]
+
+    self._ignore_index = [255]
     
     def __init__(self, data_dir, image_set="train", transform=None):
         self.data_dir = data_dir
@@ -69,33 +70,35 @@ class CustomVOCSegmentation(torch.utils.data.Dataset):
         return len(self.list_file)
 
     def __getitem__(self, index):
-        input = Image.open(os.path.join(self.path_jpeg,self.list_file[index]+'.jpg')).convert('RGB')
+        image = Image.open(os.path.join(self.path_jpeg,self.list_file[index]+'.jpg')).convert('RGB')
         target = Image.open(os.path.join(self.path_mask,self.list_file[index]+'.png'))
 
-        input = np.array(input)
+        image = np.array(image)
         target = np.array(target)
         
-        input = input / 255 # [0,255] -> [0.,1.]
+        image = image / 255 # [0,255] -> [0.,1.]
         if target.ndim == 2: # HxW -> CxHxW
             target = np.expand_dims(target,axis=-1)
 
-        data = {'input':input,'target':target}
+        data = {'image':image,'target':target}
         if self.transform is not None:
             data = self.transform(data)
         return data
+    
+    def getclasses(self):
+        return self._classes
 
-def download_pascalvoc(data_dir):
-    from torchvision.datasets import VOCSegmentation
-    _ = VOCSegmentation(root=data_dir,year="2012",image_set="trainval",download=True)
+    def getcmap(self):
+        return self._cmap
+
 
 def get_dataset(dir_path,name,image_set,transform):
     paths = {
-        "voc": (dir_path, CustomVOCSegmentation, 21),
-        "cityscape": (dir_path,)
+        "voc": (dir_path, CustomVOCSegmentation),
     }
-    p, ds_fn, num_classes = paths[name]
+    p, ds_fn = paths[name]
     ds = ds_fn(p, image_set=image_set,transform=transform)
-    return ds,num_classes
+    return ds
 
 if __name__ == "__main__":
     import matplotlib.pyplot as plt

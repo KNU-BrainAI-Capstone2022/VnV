@@ -45,8 +45,8 @@ def train_one_epoch(model,criterion,optimizer,data_loaders,lr_scheduler,epoch,be
             model.train()
 
             for batch, data in enumerate(data_loader,1):
-                inputs, targets = data['input'].to(device), data['target'].to(device)
-                outputs = model(inputs)['out']
+                images, targets = data[''].to(device), data['target'].to(device)
+                outputs = model(images)['out']
 
                 loss = criterion(outputs,targets.long())
                 optimizer.zero_grad()
@@ -79,7 +79,7 @@ def train_one_epoch(model,criterion,optimizer,data_loaders,lr_scheduler,epoch,be
             if lr_scheduler is not None:
                 lr_scheduler.step(loss_mean)
         if mode == 'train':
-            fig = make_figure(inputs,targets,outputs,colormap)
+            fig = make_figure(images,targets,outputs,colormap)
             iou = total_intersection / total_union
             iou_bar = make_iou_bar(np.nan_to_num(iou[1:]),classes[1:])
         writer.add_figure('Images',fig,epoch)
@@ -97,9 +97,9 @@ def evaluate(model,criterion,data_loader,mode):
     total_union = np.zeros((num_classes,))
     with torch.no_grad():
         for data in data_loader:
-            inputs, targets = data['input'].to(device), data['target'].to(device)
+            images, targets = data[''].to(device), data['target'].to(device)
             # Forward
-            outputs = model(inputs)['out']
+            outputs = model(images)['out']
             # Metric
             loss = criterion(outputs,targets.long())
             loss_arr.append(loss.item())
@@ -112,9 +112,9 @@ def evaluate(model,criterion,data_loader,mode):
     iou_bar = make_iou_bar(np.nan_to_num(iou[1:]),classes[1:]) # without background
     # make figure
     data = next(iter(data_loader))
-    inputs, targets = data['input'].to(device), data['target'].to(device)
-    outputs = model(inputs)['out']
-    fig = make_figure(inputs.detach().cpu(),targets.detach().cpu(),outputs.detach().cpu(),colormap)
+    images, targets = data[''].to(device), data['target'].to(device)
+    outputs = model(images)['out']
+    fig = make_figure(images.detach().cpu(),targets.detach().cpu(),outputs.detach().cpu(),colormap)
     return loss_mean,miou,fig,iou_bar
 
 if __name__=="__main__":
@@ -146,10 +146,11 @@ if __name__=="__main__":
     # GPU
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     # DataLoader
-    train_ds, num_classes = get_dataset(data_dir,args.dataset,"train",transform=get_transform(train=True,base_size=args.image_size,crop_size=int(args.image_size*0.875)))
-    val_ds, _ = get_dataset(data_dir,args.dataset,"val",transform=get_transform(train=False,base_size=args.image_size))
-    colormap = train_ds.colormap
-    classes = train_ds.classes
+    train_ds = get_dataset(data_dir,args.dataset,"train",transform=get_transform(train=True,base_size=args.image_size,crop_size=int(args.image_size*0.875)))
+    val_ds = get_dataset(data_dir,args.dataset,"val",transform=get_transform(train=False,base_size=args.image_size))
+    colormap = train_ds.getclasses()
+    classes = train_ds.getcmap()
+    num_classes = len(classes)
 
     data_loaders = {'train':DataLoader(train_ds,batch_size=batch_size,num_workers=num_workers,shuffle=True),
                     'val':DataLoader(val_ds,batch_size=batch_size,num_workers=num_workers,shuffle=False)}
