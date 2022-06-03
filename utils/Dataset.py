@@ -1,6 +1,5 @@
 #%%
 import os
-from turtle import down
 import numpy as np
 from PIL import Image
 import torch
@@ -60,7 +59,7 @@ class CustomVOCSegmentation(torch.utils.data.Dataset):
         self.image_set = image_set
         self.transform = transform
 
-        file = os.path.join(data_dir,'ImageSets','Segmentation',image_set+'.txt')
+        file = os.path.join(data_dir,'VOCdevkit','VOC2012','ImageSets','Segmentation',image_set+'.txt')
         with open(file,'r') as f:
             self.list_file = f.read().split()
         self.path_jpeg = os.path.join(data_dir,'JPEGImages')

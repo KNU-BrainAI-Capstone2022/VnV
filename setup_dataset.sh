@@ -21,15 +21,11 @@ elif [ $2 == 'cityscapes' ]; then
     read -sp "Password : " passwd
 
     wget --keep-session-cookies --save-cookies=cookies.txt --post-data "username=$name&password=$passwd&submit=Login" https://www.cityscapes-dataset.com/login/
-    wget --load-cookies cookies.txt --content-disposition https://www.cityscapes-dataset.com/file-handling/?packageID=1
-
-    unzip gtFine_trainvaltest.zip
-
+    # Download JPEG Images
+    wget --load-cookies cookies.txt --content-disposition https://www.cityscapes-dataset.com/file-handling/?packageID=3
+    unzip leftImg8bit_trainvaltest.zip
     if [ -e 'index.html' ]; then
         rm index.html
-    fi
-    if [ -e 'cookies.txt' ]; then
-        rm cookies.txt
     fi
     if [ -e 'license.txt' ]; then
         rm license.txt
@@ -37,7 +33,22 @@ elif [ $2 == 'cityscapes' ]; then
     if [ -e 'README' ]; then
         rm README
     fi
-
+    rm leftImg8bit_trainvaltest.zip
+    # Download Ground Truth
+    wget --load-cookies cookies.txt --content-disposition https://www.cityscapes-dataset.com/file-handling/?packageID=1
+    unzip gtFine_trainvaltest.zip
+    if [ -e 'index.html' ]; then
+        rm index.html
+    fi
+    if [ -e 'license.txt' ]; then
+        rm license.txt
+    fi
+    if [ -e 'README' ]; then
+        rm README
+    fi
+    if [ -e 'cookies.txt' ]; then
+        rm cookies.txt
+    fi
     rm gtFine_trainvaltest.zip
 else
     echo "dataset choice : {voc2012,cityscapes}"

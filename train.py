@@ -22,10 +22,10 @@ def get_args():
     parser.add_argument("-j", "--num_workers", default=0, type=int, help="number of data loading workers (default: 0)")
     parser.add_argument("-b", "--batch-size", default=8, type=int, help="images per gpu")
     parser.add_argument("--image-size", default=512, type=int, help="input image size")
-    parser.add_argument("--epochs", default=150, type=int, help="number of total epochs to run")
+    parser.add_argument("--epochs", default=100, type=int, help="number of total epochs to run")
     parser.add_argument("--optim", default='sgd',choices=['sgd','adam'], type=str, help="optimizer")
     parser.add_argument("--lr", default=1e-2, type=float, help="initial learning rate")
-    parser.add_argument("--momentum", default=0.2, type=float, help="momentum")
+    parser.add_argument("--momentum", default=0.5, type=float, help="momentum")
     parser.add_argument("--weight-decay",default=1e-4,type=float,help="weight_decay")
     parser.add_argument("--resume", default="", type=str, help="path of checkpoint")
     parser.add_argument("--test-only",help="Only test the model",action="store_true")
@@ -121,16 +121,11 @@ if __name__=="__main__":
     import time
     import datetime
     from torch.utils.tensorboard import SummaryWriter
-    args = get_args()
+    kargs = vars(get_args())
+    optim_kargs = {'optim':kargs['optim'],'lr':kargs['lr'],'momentum':kargs['momentum'],'weight_decay':kargs['weight_decay']}
     # PATH
     root_dir = os.path.dirname(os.path.abspath(__file__))
-    if args.dataset == "voc":
-        data_dir = os.path.join(root_dir,"dataset","VOCdevkit","VOC2012")
-    else:
-        print("아직")
-        exit()
-    train_dir = os.path.join(data_dir,"train")
-    val_dir = os.path.join(data_dir,"val")
+    data_dir = os.path.join(root_dir,"dataset")
     log_dir = os.path.join(root_dir,"logs")
     os.makedirs(log_dir,exist_ok=True)
     log_count = len(os.listdir(log_dir))+1
