@@ -94,7 +94,7 @@ class CustomVOCSegmentation(torch.utils.data.Dataset):
 
 def get_dataset(dir_path,name,image_set,transform):
     paths = {
-        "voc": (dir_path, CustomVOCSegmentation),
+        "voc2012": (dir_path, CustomVOCSegmentation),
     }
     p, ds_fn = paths[name]
     ds = ds_fn(p, image_set=image_set,transform=transform)
