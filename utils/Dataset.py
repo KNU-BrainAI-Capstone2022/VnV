@@ -164,6 +164,10 @@ class CustomCityscapesSegmentation(torch.utils.data.Dataset):
         image = image / 255 # [0,255] -> [0.,1.]
         if target.ndim == 2: # HxW -> CxHxW
             target = np.expand_dims(target,axis=-1)
+        
+        for l in self.classes:
+            idx = target==l.id
+            target[idx] = l.train_id
 
         data = {'image':image,'target':target}
         if self.transform is not None:
