@@ -2,20 +2,7 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 
-# from .utils import _SimpleSegmentationModel
-
-class _SimpleSegmentationModel(nn.Module):
-    def __init__(self, backbone, classifier):
-        super(_SimpleSegmentationModel, self).__init__()
-        self.backbone = backbone
-        self.classifier = classifier
-        
-    def forward(self, x):
-        input_shape = x.shape[-2:]
-        features = self.backbone(x)
-        x = self.classifier(features)
-        x = F.interpolate(x, size=input_shape, mode='bilinear', align_corners=False)
-        return x
+from .utils import _SimpleSegmentationModel
 
 __all__ = ["DeepLabV3"]
 
