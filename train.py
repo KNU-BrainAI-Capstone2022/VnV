@@ -1,4 +1,7 @@
+from tqdm import tqdm
+
 import os
+import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -7,18 +10,23 @@ import torchvision
 from torch.utils.data import DataLoader
 from torchvision.models.segmentation import fcn_resnet50
 
-from models.model import Unet
-from utils.Util import make_figure,make_iou_bar,save,load
-from utils.Dataset import get_dataset
-from utils.Transform import get_transform
-from utils.Metric import intersection_union
+import .models
+from utils import save,load
+from utils import intersection_union,make_figure,make_iou_bar
+from utils import get_dataset,get_transform
 
 def get_args():
-    import argparse
 
     parser = argparse.ArgumentParser(description="PyTorch Segmentation Training")
+    parser.add_argument("--data_root", type=str,'./dataset' help="path to Dataset",required=True)
     parser.add_argument("--dataset", choices=['voc2012','cityscapes'], type=str, help="dataset name",required=True)
-    parser.add_argument("--model", choices=['fcn','unet','deeplabv3+'], type=str, help="model name",required=True)
+    parser.add_argument("--num_classes", type=int, default=None,help="num classes (default: None)")
+    available_models = sorted(name for name in models.model.__dict__ if name.islower() and \
+                              not (name.startswith("__") or name.startswith('_')) and callable(
+                              network.modeling.__dict__[name])
+                              )
+
+    parser.add_argument("--model", choices=['fcn_resnet50','fcn_resnet101','deeplabv3plus_resnet50','deeplabv3plus_resnet101'], type=str, help="model name",required=True)
     parser.add_argument("-j", "--num_workers", default=0, type=int, help="number of data loading workers (default: 0)")
     parser.add_argument("-b", "--batch-size", default=8, type=int, help="images per gpu")
     parser.add_argument("--epochs", default=100, type=int, help="number of total epochs to run")
