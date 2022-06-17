@@ -5,17 +5,16 @@ import numpy as np
 import matplotlib.pyplot as plt
 # -------------------------- Model -----------------------------------
 # 모델 저장 함수
-def save(ckpt_dir,model,optim,lr_scheduler,cur_iter,best_score,time,filename):
+def save(ckpt_dir,model,optim,lr_scheduler,cur_iter,best_score,filename):
     if not os.path.exists(ckpt_dir):
         os.mkdir(ckpt_dir)
     filepath = os.path.join(ckpt_dir,filename)
     torch.save({
+        'cur_iter':cur_iter,
         'model_state':model.state_dict(),
         'optim_state':optim.state_dict(),
-        "lr_scheduler_state": scheduler.state_dict(),
-        'cur_iter':cur_iter,
+        "lr_scheduler_state": lr_scheduler.state_dict(),
         'best_score':best_score,
-        'time':time
         },filepath)
     print("Model saved as %s" % filepath)
 
@@ -28,25 +27,22 @@ def load(ckpt_dir,model,optim,lr_scheduler,kargs):
     else:
         cur_iter = 0
         best_score = 0
-        time = 0
-        return model,optim,lr_scheduler,cur_iter,best_score,time
+        return model,optim,lr_scheduler,cur_iter,best_score
 
     if not os.path.exists(ckpt):
         cur_iter = 0
         best_score = 0
-        time = 0
         print("There is no checkpoint")
-        return model,optim,lr_scheduler,cur_iter,best_score,time
+        return model,optim,lr_scheduler,cur_iter,best_score
 
     dict_model = torch.load(ckpt)
-    model.load_state_dict(dict_model['model'])
-    optim.load_state_dict(dict_model['optim'])
-    lr_scheduler.load_state_dict(dict_model['lr_scheduler'])
+    model.load_state_dict(dict_model['model_state'])
+    optim.load_state_dict(dict_model['optim_state'])
+    lr_scheduler.load_state_dict(dict_model['lr_scheduler_state'])
     cur_iter = dict_model['cur_iter']
     best_score = dict_model['best_score']
-    time = dict_model['time']
     print("Model restored from %s" % ckpt)
-    return model,optim,lr_scheduler,cur_iter,best_score,time
+    return model,optim,lr_scheduler,cur_iter,best_score
 # -------------------------- Model -----------------------------------
 
 # -------------------------- Metric / Result -----------------------------------
