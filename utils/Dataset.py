@@ -189,14 +189,14 @@ class CustomCityscapesSegmentation(torch.utils.data.Dataset):
                 #print(f'train id : {i.train_id} {cmap[-1]}')
         return cmap
     
-def get_dataset(dir_path,dataset):
+def get_dataset(dir_path,karg):
 
-    if dataset =='voc2012':
+    if karg['dataset'] =='voc2012':
         train_transform = Compose([
             ToTensor(),
             Normalize((0.485,0.456,0.406),(0.229,0.224,0.225)),
             Resize(512),
-            RandomCrop(crop_size=256, pad_if_needed=True),
+            RandomCrop(crop_size=karg['crop_size'], pad_if_needed=True),
             RandomHorizontalFlip(),
             
         ])
@@ -213,11 +213,11 @@ def get_dataset(dir_path,dataset):
                                             image_set="val",
                                             transform=val_transform)
 
-    if dataset =='cityscapes':
+    if karg['dataset'] =='cityscapes':
         train_transform = Compose([
             ToTensor(),
             Normalize((0.485,0.456,0.406),(0.229,0.224,0.225)),
-            RandomCrop(512),
+            RandomCrop(karg['crop_size']),
             RandomHorizontalFlip(),
         ])
         val_transform = Compose([
