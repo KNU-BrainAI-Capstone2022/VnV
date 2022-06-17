@@ -1,7 +1,7 @@
 from .utils import IntermediateLayerGetter
 from .deeplab import DeepLabHead, DeepLabHeadV3Plus, DeepLabV3
 from .backbone import resnet
-from fcn import *
+from .fcn import FCN8
 
 def _segm_resnet(name, backbone_name, num_classes, output_stride, pretrained_backbone):
 
@@ -31,10 +31,7 @@ def _segm_resnet(name, backbone_name, num_classes, output_stride, pretrained_bac
     return model
 
 def _load_model(arch_type, backbone, num_classes, output_stride, pretrained_backbone):
-
-    if backbone=='mobilenetv2':
-        model = _segm_mobilenet(arch_type, backbone, num_classes, output_stride=output_stride, pretrained_backbone=pretrained_backbone)
-    elif backbone.startswith('resnet'):
+    if backbone.startswith('resnet'):
         model = _segm_resnet(arch_type, backbone, num_classes, output_stride=output_stride, pretrained_backbone=pretrained_backbone)
     else:
         raise NotImplementedError
