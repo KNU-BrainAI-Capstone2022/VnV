@@ -37,7 +37,7 @@ class Resize(object):
         return data
 
 class RandomCrop(object):
-    def __init__(self, crop_size, padding=0, pad_if_needed=False):
+    def __init__(self, crop_size, pad_if_needed=False, padding=0):
         assert isinstance(crop_size, (int, tuple))
         if isinstance(crop_size, int):
             self.crop_size = (crop_size, crop_size)
@@ -50,21 +50,21 @@ class RandomCrop(object):
     def __call__(self, data):
         img = data['image']
         lbl = data['target']
-
-        assert img.size == lbl.size, 'size of img and lbl should be the same. %s, %s'%(img.size, lbl.size)
+        
+        assert img.shape[-2:] == lbl.shape[-2:], 'size of img and lbl should be the same. %s, %s'%(img.size, lbl.size)
         if self.padding > 0:
             img = F.pad(img, self.padding)
             lbl = F.pad(lbl, self.padding)
         
         # pad the width if needed
-        if self.pad_if_needed and img.size[0] < self.crop_size[1]:
-            img = F.pad(img, padding=int((1+ self.crop_size[1] - img.size[0]) / 2))
-            lbl = F.pad(lbl, padding=int((1+ self.crop_size[1] - lbl.size[0]) / 2))
+        if self.pad_if_needed and img.size(1) < self.crop_size[1]:
+            img = F.pad(img, padding=int((1+ self.crop_size[1] - img.size(1)) / 2))
+            lbl = F.pad(lbl, padding=int((1+ self.crop_size[1] - lbl.size(1)) / 2))
 
         # pad the height if needed
-        if self.pad_if_needed and img.size[1] < self.crop_size[0]:
-            img = F.pad(img, padding=int((1+self.crop_size[0] - img.size[1]) / 2 ))
-            lbl = F.pad(lbl, padding=int((1+self.crop_size[0] - lbl.size[1]) / 2 ))
+        if self.pad_if_needed and img.size(2) < self.crop_size[0]:
+            img = F.pad(img, padding=int((1+self.crop_size[0] - img.size(2)) / 2 ))
+            lbl = F.pad(lbl, padding=int((1+self.crop_size[0] - lbl.size(2)) / 2 ))
 
         h, w = img.shape[-2:]
         new_h, new_w = self.crop_size

@@ -175,7 +175,11 @@ class CustomCityscapesSegmentation(torch.utils.data.Dataset):
         return data
     
     def getclasses(self):
-        return self._classes
+        classes = []
+        for i in self.classes:
+            if i.train_id >=0 and i.train_id <19:
+                classes.append(i.name)
+        return classes
 
     def getcmap(self):
         cmap = []
@@ -192,7 +196,7 @@ def get_dataset(dir_path,dataset):
             ToTensor(),
             Normalize((0.485,0.456,0.406),(0.229,0.224,0.225)),
             Resize(512),
-            RandomCrop(412),
+            RandomCrop(crop_size=256, pad_if_needed=True),
             RandomHorizontalFlip(),
             
         ])
