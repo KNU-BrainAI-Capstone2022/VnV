@@ -1,6 +1,7 @@
 from .utils import IntermediateLayerGetter
 from .deeplab import DeepLabHead, DeepLabHeadV3Plus, DeepLabV3
 from .backbone import resnet
+from fcn import *
 
 def _segm_resnet(name, backbone_name, num_classes, output_stride, pretrained_backbone):
 
@@ -75,3 +76,13 @@ def deeplabv3plus_resnet101(num_classes=21, output_stride=8, pretrained_backbone
         pretrained_backbone (bool): If True, use the pretrained backbone.
     """
     return _load_model('deeplabv3plus', 'resnet101', num_classes, output_stride=output_stride, pretrained_backbone=pretrained_backbone)
+
+def fcn_resnet50(num_classes=21, output_stride=8, pretrained_backbone=True):
+    backbone = resnet.resnet50(pretrained=pretrained_backbone)
+    model = FCN8(backbone,num_classes)
+    return model
+
+def fcn_resnet101(num_classes=21, output_stride=8, pretrained_backbone=True):
+    backbone = resnet.resnet101(pretrained=pretrained_backbone)
+    model = FCN8(backbone,num_classes)
+    return model
