@@ -4,6 +4,8 @@ import numpy as np
 from PIL import Image
 import torch
 from collections import namedtuple
+from torchvision.transforms import Compose
+from Transform import *
 
 class CustomVOCSegmentation(torch.utils.data.Dataset):
     def __init__(self, data_dir, image_set="train", transform=None):
@@ -75,7 +77,6 @@ class CustomVOCSegmentation(torch.utils.data.Dataset):
         image = np.array(image)
         target = np.array(target)
         
-        image = image / 255 # [0,255] -> [0.,1.]
         if target.ndim == 2: # HxW -> CxHxW
             target = np.expand_dims(target,axis=-1)
 
@@ -158,10 +159,9 @@ class CustomCityscapesSegmentation(torch.utils.data.Dataset):
         image = Image.open(self.images[index]).convert('RGB')
         target = Image.open(self.targets[index])
 
-        image = np.array(image)
-        target = np.array(target)
+        image = np.array(image, dtype=np.float32)
+        target = np.array(target, dtype=np.uint8)
         
-        image = image / 255 # [0,255] -> [0.,1.]
         if target.ndim == 2: # HxW -> CxHxW
             target = np.expand_dims(target,axis=-1)
         
@@ -175,25 +175,75 @@ class CustomCityscapesSegmentation(torch.utils.data.Dataset):
         return data
     
     def getclasses(self):
-        return self._classes
+        classes = []
+        for i in self.classes:
+            if i.train_id >=0 and i.train_id <19:
+                classes.append(i.name)
+        return classes
 
     def getcmap(self):
-        return self._cmap
+        cmap = []
+        for i in self.classes:
+            if i.train_id >=0 and i.train_id <19:
+                cmap.append(i.color)
+                #print(f'train id : {i.train_id} {cmap[-1]}')
+        return cmap
     
-def get_dataset(dir_path,dataset,image_set,transform=None):
-    paths = {
-        "voc2012": (dir_path, CustomVOCSegmentation),
-        "cityscapes":(dir_path, CustomCityscapesSegmentation),
-    }
-    path, dataset_fn = paths[dataset]
-    ds = dataset_fn(path, image_set=image_set,transform=transform)
-    return ds
+def get_dataset(dir_path,dataset):
+
+    if dataset =='voc2012':
+        train_transform = Compose([
+            ToTensor(),
+            Normalize((0.485,0.456,0.406),(0.229,0.224,0.225)),
+            Resize(512),
+            RandomCrop(crop_size=256, pad_if_needed=True),
+            RandomHorizontalFlip(),
+            
+        ])
+        val_transform = Compose([
+            ToTensor(),
+            Normalize((0.485,0.456,0.406),(0.229,0.224,0.225)),
+            Resize(512),
+        ])
+
+        train_dataset = CustomVOCSegmentation(data_dir=dir_path,
+                                            image_set="train",
+                                            transform=train_transform)
+        val_dataset = CustomVOCSegmentation(data_dir=dir_path,
+                                            image_set="val",
+                                            transform=val_transform)
+
+    if dataset =='cityscapes':
+        train_transform = Compose([
+            ToTensor(),
+            Normalize((0.485,0.456,0.406),(0.229,0.224,0.225)),
+            RandomCrop(512),
+            RandomHorizontalFlip(),
+        ])
+        val_transform = Compose([
+            ToTensor(),
+            Normalize((0.485,0.456,0.406),(0.229,0.224,0.225)),
+        ])
+        
+        train_dataset = CustomCityscapesSegmentation(data_dir=dir_path,
+                                            image_set="train",
+                                            transform=train_transform)
+        val_dataset = CustomCityscapesSegmentation(data_dir=dir_path,
+                                            image_set="val",
+                                            transform=val_transform)
+    
+    return train_dataset, val_dataset
 
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
     import torchvision
     from torch.utils.data import DataLoader
-    from Transform import transforms_train
+    import argparse
+
+    def get_args():
+        parser = argparse.ArgumentParser(description="PyTorch Segmentation Training")
+        parser.add_argument("--dataset", choices=['voc2012','cityscapes'], type=str, help="dataset name",required=True)
+        return parser.parse_args()
 
     def decode_segmap(masks,colormap):
         r_mask = torch.zeros_like(masks,dtype=torch.uint8)
@@ -201,30 +251,32 @@ if __name__ == "__main__":
         b_mask = torch.zeros_like(masks,dtype=torch.uint8)
         for k in range(len(colormap)):
             indices = masks == k
-            print(r_mask[indices].shape)
+            #print(r_mask[indices].shape)
             r_mask[indices] = colormap[k][0]
             g_mask[indices] = colormap[k][1]
             b_mask[indices] = colormap[k][2]
         return torch.cat([r_mask,g_mask,b_mask],dim=1)
 
+    kargs = vars(get_args())
+
     root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     # download_pascalvoc(os.path.join(root_dir,'dataset'))
-    data_dir = os.path.join(root_dir,'dataset','VOCdevkit','VOC2012')
-    
-    train_dataset = CustomVOCSegmentation(data_dir=data_dir,
-                                          image_set="train",
-                                          transform=transforms_train())
-    colormap = CustomVOCSegmentation.colormap
+
+    data_dir = os.path.join(root_dir,'dataset')
+
+    train_dataset, val_dataset = get_dataset(data_dir,kargs['dataset'])
+    colormap = train_dataset.getcmap()
+
     train_loader = DataLoader(train_dataset,batch_size=4,shuffle=True)
     for data in train_loader:
-        images,targets = data['input'],data['target']
+        images,targets = data['image'],data['target']
         fig, ax = plt.subplots(2,1,figsize=(12,6))
         ax[0].imshow(torchvision.utils.make_grid(images.cpu(), normalize=True).permute(1,2,0))
         ax[0].set_title("Input")
         ax[0].axis('off')
-        print(targets.shape)
+        #print(targets.shape)
         targets = decode_segmap(targets,colormap)
-        print(targets.shape)
+        #print(targets.shape)
         ax[1].imshow(torchvision.utils.make_grid(targets.cpu()).permute(1,2,0))
         ax[1].set_title("Target")
         ax[1].axis('off')
@@ -232,4 +284,3 @@ if __name__ == "__main__":
         fig.tight_layout()
         plt.show()
         break
-        
