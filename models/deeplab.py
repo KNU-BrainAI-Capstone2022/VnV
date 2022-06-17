@@ -6,7 +6,6 @@ from .utils import _SimpleSegmentationModel
 
 __all__ = ["DeepLabV3"]
 
-
 class DeepLabV3(_SimpleSegmentationModel):
     """
     Implements DeepLabV3 model from
