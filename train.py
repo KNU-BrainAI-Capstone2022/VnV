@@ -18,171 +18,185 @@ from utils import get_dataset,get_transform
 def get_args():
 
     parser = argparse.ArgumentParser(description="PyTorch Segmentation Training")
+    # Dataset Options
     parser.add_argument("--data_root", type=str,'./dataset' help="path to Dataset",required=True)
     parser.add_argument("--dataset", choices=['voc2012','cityscapes'], type=str, help="dataset name",required=True)
     parser.add_argument("--num_classes", type=int, default=None,help="num classes (default: None)")
+
     available_models = sorted(name for name in models.model.__dict__ if name.islower() and \
                               not (name.startswith("__") or name.startswith('_')) and callable(
-                              network.modeling.__dict__[name])
+                              models.model.__dict__[name])
                               )
+    # Model Options
+    parser.add_argument("--model", choices=available_models, type=str, help="model name",required=True)
+    parser.add_argument("--output_stride", type=int, default=16, choices=[8, 16])
 
-    parser.add_argument("--model", choices=['fcn_resnet50','fcn_resnet101','deeplabv3plus_resnet50','deeplabv3plus_resnet101'], type=str, help="model name",required=True)
+    # Train Options
+    parser.add_argument("--test_only",action="store_true",help="Only test the model")
+    parser.add_argument("--save_results", action='store_true', default=False,help="save segmentation results")
+    parser.add_argument("--total_iters", default=3e5, type=int, help="number of total iterations to run (default: 30k)")
     parser.add_argument("-j", "--num_workers", default=0, type=int, help="number of data loading workers (default: 0)")
-    parser.add_argument("-b", "--batch-size", default=8, type=int, help="images per gpu")
-    parser.add_argument("--epochs", default=100, type=int, help="number of total epochs to run")
-    parser.add_argument("--optim", default='sgd',choices=['sgd','adam'], type=str, help="optimizer")
+    parser.add_argument("--batch_size", default=8, type=int, help="images per gpu")
+    parser.add_argument("--val_batch_size", default=8, type=int, help="images per gpu")
     parser.add_argument("--lr", default=1e-2, type=float, help="initial learning rate")
-    parser.add_argument("--momentum", default=0.5, type=float, help="momentum")
-    parser.add_argument("--weight-decay",default=1e-4,type=float,help="weight_decay")
-    parser.add_argument("--image-size", default=512, type=int, help="input image size")
-    parser.add_argument("--resume", default="", type=str, help="path of checkpoint")
-    parser.add_argument("--test-only",help="Only test the model",action="store_true")
+    parser.add_argument("--lr_scheduler", type=str, default='exp', choices=['exp', 'step'],help="learning rate scheduler policy")
+    parser.add_argument("--step_size", type=int, default=1e4,help="(default: 10k)")
+    parser.add_argument("--weight_decay",default=1e-4,type=float,help="weight_decay")
+    parser.add_argument("--crop_size", default=512, type=int, help="input image crop size")
+    parser.add_argument("--resume", action='store_true', default=False)
+    parser.add_argument("--print_interval", type=int, default=10,help="print interval of loss (default: 10)")
+    parser.add_argument("--val_interval", type=int, default=100,help="iteration interval for eval (default: 100)")
 
     return parser.parse_args()
 
-def get_optimizer(kargs):
-    optims = {
-        'sgd':torch.optim.SGD(model.parameters(),lr=kargs['lr'],
-                            momentum=kargs['momentum'],
-                            weight_decay=kargs['weight_decay']),
-        'adam':torch.optim.Adam(model.parameters(),lr=kargs['lr'])
-    }
-    return optims[kargs['optim']]
+def validate(args,model,dataloader,device,kargs):
+    metrics.reset()
+    model.eval()
+    if kargs['save_results']:
+        if not os.path.exists('results'):
+            os.mkdir('results')
+    img_id = 0
+    with torch.no_grad():
+        for batch, data in tqdm(enumerate(dataloader)):
+            images = data['image'].to(device, dtype=torch.float32)
+            labels = label['target'].to(device, dtype=torch.long)
 
-def train_one_epoch(model,criterion,optimizer,data_loaders,lr_scheduler,epoch,best_miou):
-    model.train()
-    for mode in ['train','val']:
-        data_loader = data_loaders[mode]
-        header = mode.upper()
-        loss_arr = []
-        total_intersection = np.zeros((num_classes,))
-        total_union = np.zeros((num_classes,))
-        if mode == 'train':
-            writer = writer_train
-            model.train()
+            outputs = model(images)
+            preds = outputs.detach().max(dim=1)[1].cpu().numpy()
+            targets = labels.cpu().numpy()
 
-            for batch, data in enumerate(data_loader,1):
-                images, targets = data['image'].to(device), data['target'].to(device)
-                outputs = model(images)
+            metrics.update(targets, preds)
 
-                loss = criterion(outputs,targets.long())
-                optimizer.zero_grad()
-                loss.backward()
-                optimizer.step()
-                # Metric
-                loss_arr.append(loss.item())
-                loss_mean = np.mean(loss_arr)
-                intersection, union = intersection_union(outputs,targets,num_classes)
-                total_intersection += intersection
-                total_union += union
-                miou = np.nanmean(total_intersection[1:]) / np.nanmean(total_union[1:])
-                # Result
-                line = f"{header}: EPOCH {epoch:04d} / {epochs:04d} | BATCH {batch:04d} / {num_batch_train:04d} | LOSS {loss_mean:.4f} | mIOU {miou:.4f}"
-                print(line)
-                logfile.write(line+"\n")
-                # Tensorboard
-                writer.add_scalar('loss',loss_mean,(epoch-1)*num_batch_train+batch)
-                writer.add_scalar('mIOU',miou,(epoch-1)*num_batch_train+batch)
-        else:
-            writer = writer_val
-            loss_mean,miou,fig,iou_bar = evaluate(model,criterion,data_loader,mode=mode)
-            # Result
-            line = f"{header}: EPOCH {epoch:04d} / {epochs:04d} | LOSS {loss_mean:.4f} | mIOU {miou:.4f}"
-            print(line)
-            logfile.write(line+"\n")
-            # Tensorboard
-            writer.add_scalar('loss',loss_mean,(epoch-1)*num_batch_train+batch)
-            writer.add_scalar('mIOU',miou,(epoch-1)*num_batch_train+batch)
-            if lr_scheduler is not None:
-                lr_scheduler.step(loss_mean)
-        if mode == 'train':
-            fig = make_figure(images,targets,outputs,colormap)
-            iou = total_intersection / total_union
-            iou_bar = make_iou_bar(np.nan_to_num(iou[1:]),classes[1:])
-        writer.add_figure('Images',fig,epoch)
-        writer.add_figure('IOU',iou_bar,epoch)
-    if mode == 'val' and best_miou < miou: # Best Model save
-        save(ckpt_dir,model,optim,epoch,miou,"model_best.pth")
-        best_miou = miou # Checkpoint save
-    if epoch % 20 == 0:
-        save(ckpt_dir,model,optim,epoch,best_miou)
+            if kargs['save_results']:
+                for i in range(len(images)):
+                    image = images[i].detach().cpu().numpy()
+                    target = targets[i]
+                    pred = preds[i]
 
-if __name__=="__main__":
+                    image = (denorm(image) * 255).transpose(1, 2, 0).astype(np.uint8)
+                    target = loader.dataset.decode_target(target).astype(np.uint8)
+                    pred = loader.dataset.decode_target(pred).astype(np.uint8)
+
+                    Image.fromarray(image).save('results/%d_image.png' % img_id)
+                    Image.fromarray(target).save('results/%d_target.png' % img_id)
+                    Image.fromarray(pred).save('results/%d_pred.png' % img_id)
+
+                    fig = plt.figure()
+                    plt.imshow(image)
+                    plt.axis('off')
+                    plt.imshow(pred, alpha=0.7)
+                    ax = plt.gca()
+                    ax.xaxis.set_major_locator(matplotlib.ticker.NullLocator())
+                    ax.yaxis.set_major_locator(matplotlib.ticker.NullLocator())
+                    plt.savefig('results/%d_overlay.png' % img_id, bbox_inches='tight', pad_inches=0)
+                    plt.close()
+                    img_id += 1
+
+        score = metrics.get_results()
+    return score
+
+def main():
     import time
     import datetime
     from torch.utils.tensorboard import SummaryWriter
 
     kargs = vars(get_args())
+    if kargs['dataset'].lower() == 'voc2012':
+        kargs['num_classes'] = 21   
+    elif kargs['dataset'].lower() == 'cityscapes':
+        kargs['num_classes'] = 19
+    
+    # GPU
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     # PATH
     root_dir = os.path.dirname(os.path.abspath(__file__))
     data_dir = os.path.join(root_dir,"dataset")
     log_dir = os.path.join(root_dir,"logs")
     os.makedirs(log_dir,exist_ok=True)
-    if kargs['resume']:
-        log_dir = os.path.join(log_dir,kargs['resume'])
-        ckpt_dir = os.path.join(root_dir,"checkpoint",kargs['resume'])
-    else:
-        log_dir = os.path.join(log_dir,f'{kargs['model']}_{kargs['dataset']}_{kargs['optim']}')
-        ckpt_dir = os.path.join(root_dir,"checkpoint",f'{kargs['model']}_{kargs['dataset']}_{kargs['optim']}')
+    log_dir = os.path.join(log_dir,f'{kargs['model']}_{kargs['dataset']}')
+    ckpt_dir = os.path.join(root_dir,"checkpoint",f'{kargs['model']}_{kargs['dataset']}')
 
-    batch_size = kargs['batch_size']
-    num_workers = kargs['num_workers']
-    epochs = kargs['epochs']
-    # GPU
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     # DataLoader
-    train_ds = get_dataset(data_dir,kargs['dataset'],"train",transform=get_transform(kargs['dataset'],train=True))
-    val_ds = get_dataset(data_dir,kargs['dataset'],"val",transform=get_transform(kargs['dataset'],train=False))
-    data_loaders = {'train':DataLoader(train_ds,batch_size=batch_size,num_workers=num_workers,shuffle=True),
-                    'val':DataLoader(val_ds,batch_size=batch_size,num_workers=num_workers,shuffle=False)}
+    train_ds, val_ds= get_dataset(data_dir,kargs)
+    dataloaders = {'train':DataLoader(train_ds,batch_size=kargs['batch_size'],num_workers=kargs['num_workers'],shuffle=True),
+                    'val':DataLoader(val_ds,batch_size=kargs['batch_size'],num_workers=kargs['num_workers'],shuffle=False)}
     # Parameters
-    colormap = train_ds.getclasses()
-    classes = train_ds.getcmap()
-    num_classes = len(classes)
+    total_iters = kargs['total_iters']
+    colormap = train_ds.getcmap()
 
-    num_data_train = len(train_ds)
-    num_batch_train = int(np.ceil(num_data_train/batch_size))
     # Model
-    model = get_model(kargs['model'],num_classes).to(device)
-    params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    model = models.model.__dict__[kargs['model']](num_classes=kargs['num_classes'],output_stride=kargs['output_stride']).to(device)
     # Loss
-    loss_fn = torch.nn.CrossEntropyLoss(ignore_index=255)
+    criterion = torch.nn.CrossEntropyLoss(ignore_index=255)
     # Optimizer
-    optim = get_optimizer(kargs)
-    lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optim,factor=0.2,patience=10)
+    optimizer = torch.optim.SGD(params=[
+        {'params': model.backbone.parameters(), 'lr': 0.1 * kargs['lr']},
+        {'params': model.classifier.parameters(), 'lr': kargs['lr']},
+    ], lr=kargs['lr'], momentum=0.9, weight_decay=kargs['weight_decay'])
+    if kargs['lr_scheduler'] == 'exp':
+        lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.9)
+    elif kargs['lr_scheduler'] == 'step':
+        lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=kargs['step_size'], gamma=0.1)
 
     # Load Checkpoint
-    if kargs['resume']:
-        model, optim, start_epoch, best_miou, time_offset = load(ckpt_dir=ckpt_dir,name=kargs['resume'],net=model,optim=optim)
-    else:
-        start_epoch, best_miou, time_offset = 0, 0, 0
-
+    model, optimizer, lr_scheduler, cur_iter, best_score, time_offset = load(ckpt_dir,model,optimizer,lr_scheduler,kargs)
+    # Metric
+    metrics = SegMetrics(kargs['num_classes'])
     # Test-only
     if args.test_only:
-        model, optim, _, _, _ = load(ckpt_dir=ckpt_dir,model=model,optim=optim,name="model_best.pth")
         start=time.time()
-        loss_mean,miou,fig,iou_bar= evaluate(model,loss_fn,data_loaders['val'],mode="test")
+        val_score = validate(model,criterion,dataloaders['val'],metrics,device,kargs)
         end = time.time()
-        print(f"TEST: LOSS {loss_mean:.4f} | mIOU {miou:.4f}")
+        print(metrics.to_str(val_score))
         print(f"Average Inference Time : {(end-start)/len(val_ds)}")
-        fig.savefig('Prediction.png')
-        iou_bar.savefig('IOU.png')
     else:
         # Tensorboard
         writer_train = SummaryWriter(log_dir=os.path.join(log_dir,"train"))
         writer_val = SummaryWriter(log_dir=os.path.join(log_dir,"val"))
         # Train log
-        logfile = open(os.path.join(log_dir,"trainlog.txt"),"a")
-        logfile.write("Train Start : "+str(datetime.datetime.now())+"\n")
         start_time = time.time()
-        for epoch in range(start_epoch+1,epochs+1):
-            train_one_epoch(model,loss_fn,optim,data_loaders,lr_scheduler,epoch,best_miou)
-        evaluate(model,loss_fn,data_loaders['val'],'test')
+        epoch = 0
+        while True:
+            model.train()
+            epoch += 1
+            interval_loss = 0.0
+            for batch, data in enumerate(dataloader,1):
+                cur_iter += 1
+                images = data['image'].to(device,dtype=torch.float32)
+                targets = data['target'].to(device,dtype=torch.long)
+                outputs = model(images)
+
+                optimizer.zero_grad()
+                loss = criterion(outputs,targets)
+                loss.backward()
+                optimizer.step()
+                # Metric
+                interval_loss += loss.detach().cpu().numpy()
+                # Tensorboard
+                writer_train.add_scalar('loss',loss_mean,cur_iter)
+                if cur_iter % kargs['print_interval'] == 0:
+                    print("EPOCH {epoch} | ITERATION {cur_iter} / {kargs['total_iters']} | LOSS {interval_loss / 10:.4f}")
+                if cur_iter % kargs['val_interval'] == 0:
+                    val_score = validate(model,criterion,dataloaders['val'],metrics,device,kargs)
+                    print(metrics.to_str(val_score))
+                    save(ckpt_dir,model,optim,lr_scheduler,cur_iter,best_score,time,"model_last.pth")
+                    if val_score['Mean IoU'] > best_score:  # save best model
+                        best_score = val_score['Mean IoU']
+                        save(ckpt_dir,model,optim,lr_scheduler,cur_iter,best_score,time,"model_best.pth")
+                    writer_val.add_scalar('Mean Acc',val_score['Mean Acc'],cur_iter)
+                    writer_val.add_scalar('mIOU',val_score['Mean IoU'],cur_iter)
+                    if cur_iter % 1000 == 0
+                        fig = make_figure(images,targets,outputs,colormap)
+                        iou = total_intersection / total_union
+                        iou_bar = make_iou_bar(np.nan_to_num(val_score['Class IoU']))
+                        writer_val.add_figure('Images',fig,cur_iter)
+                        writer_val.add_figure('IOU',iou_bar,cur_iter)
+                    model.train()
+            lr_scheduler.step()
         total_time = time.time() - start_time + time_offset
         writer_train.add_text("total time",str(datetime.timedelta(seconds=total_time)))
-        writer_train.add_text("Parameters",str(params))
-        logfile.write("Total Time : "+str(datetime.timedelta(seconds=total_time))+"\n")
-        logfile.close()
         writer_train.close()
         writer_val.close()
 
+if __name__=="__main__":
+    main()
