@@ -5,13 +5,19 @@ import utils
 
 class FCN8(nn.Module):
     # vgg 16 
-    def __init__(self,backbone,num_class=21):
+    def __init__(self,num_class=21):
         super(FCN8, self).__init__()
-        self.backbone = backbone
 
-        self.fc1 = nn.Conv2d(in_channels=512,out_channels=4096,kernel_size=1)
-        self.fc2 = nn.Conv2d(4096,4096,kernel_size=1)
-        self.fc3 = nn.Conv2d(4096,num_class,kernel_size=1)
+        self.classifier3 = nn.Sequential(
+            nn.Conv2d(in_channels=512,out_channels=4096,kernel_size=1),
+            nn.ReLU(inplace=True),
+            nn.Dropout2d(0.5),
+            nn.Conv2d(4096,4096,kernel_size=1),
+            nn.ReLU(inplace=True),
+            nn.Dropout2d(0.5),
+            nn.Conv2d(4096,num_class,kernel_size=1),
+        )
+
         self.pool4_conv = nn.Conv2d(512,21,kernel_size=1)
         self.pool3_conv = nn.Conv2d(256,21,kernel_size=1)
 
@@ -21,23 +27,15 @@ class FCN8(nn.Module):
 
         self.relu    = nn.ReLU(inplace=True)
         self.dropout = nn.Dropout2d(0.5)
+        self._initialize_weights()
 
-    def forward(self, x):
-        back_layers = utils.IntermediateLayerGetter(self.backbone, {'layer2': 1, 'layer3': 2, 'layer4': 3})
-        pool = back_layers(x)
-        pool = list(pool.values())
-
-        pool3 = pool[0]
-        pool4 = pool[1]
-        pool5 = pool[2]
+    def forward(self, features):
+    
+        pool3 = features['layer2']
+        pool4 = features['layer3']
+        pool5 = features['layer4']
         
-        pool5 = self.fc1(pool5)
-        pool5 = self.relu(pool5)
-        pool5 = self.dropout(pool5)
-        pool5 = self.fc2(pool5)
-        pool5 = self.relu(pool5)
-        pool5 = self.dropout(pool5)
-        pool5 = self.fc3(pool5)
+        pool5 = self.classifier3(pool5)
 
         # 1/32 *2 + 1/16
         pool5 = self.upsample2(pool5)
