@@ -68,12 +68,12 @@ class RandomCrop(object):
 
         h, w = img.shape[-2:]
         new_h, new_w = self.crop_size
-
+        
         top = random.randint(0, h - new_h)
         left = random.randint(0, w - new_w)
-
-        data['image'] = F.crop(img,top,left,h,w)
-        data['target'] = F.crop(lbl,top,left,h,w)
+        
+        data['image'] = F.crop(img,top,left,new_h,new_w)
+        data['target'] = F.crop(lbl,top,left,new_h,new_w)
 
         return data
 

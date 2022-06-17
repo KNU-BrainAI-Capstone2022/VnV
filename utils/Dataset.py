@@ -5,7 +5,7 @@ from PIL import Image
 import torch
 from collections import namedtuple
 from torchvision.transforms import Compose
-from Transform import *
+from .Transform import *
 
 class CustomVOCSegmentation(torch.utils.data.Dataset):
     def __init__(self, data_dir, image_set="train", transform=None):
@@ -64,8 +64,8 @@ class CustomVOCSegmentation(torch.utils.data.Dataset):
         file = os.path.join(data_dir,'VOCdevkit','VOC2012','ImageSets','Segmentation',image_set+'.txt')
         with open(file,'r') as f:
             self.list_file = f.read().split()
-        self.path_jpeg = os.path.join(data_dir,'JPEGImages')
-        self.path_mask = os.path.join(data_dir,'SegmentationClass')
+        self.path_jpeg = os.path.join(data_dir,'VOCdevkit','VOC2012','JPEGImages')
+        self.path_mask = os.path.join(data_dir,'VOCdevkit','VOC2012','SegmentationClass')
 
     def __len__(self):
         return len(self.list_file)
@@ -74,8 +74,8 @@ class CustomVOCSegmentation(torch.utils.data.Dataset):
         image = Image.open(os.path.join(self.path_jpeg,self.list_file[index]+'.jpg')).convert('RGB')
         target = Image.open(os.path.join(self.path_mask,self.list_file[index]+'.png'))
 
-        image = np.array(image)
-        target = np.array(target)
+        image = np.array(image,dtype=np.float32)
+        target = np.array(target, dtype=np.uint8)
         
         if target.ndim == 2: # HxW -> CxHxW
             target = np.expand_dims(target,axis=-1)

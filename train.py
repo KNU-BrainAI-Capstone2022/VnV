@@ -8,27 +8,24 @@ import matplotlib.pyplot as plt
 import torch
 import torchvision
 from torch.utils.data import DataLoader
-from torchvision.models.segmentation import fcn_resnet50
 
-import .models
-from utils import save,load
-from utils import intersection_union,make_figure,make_iou_bar
-from utils import get_dataset,get_transform
+import models
+import utils
 
 def get_args():
 
     parser = argparse.ArgumentParser(description="PyTorch Segmentation Training")
     # Dataset Options
-    parser.add_argument("--data_root", type=str,'./dataset' help="path to Dataset",required=True)
+    parser.add_argument("--data_root", type=str, default='./dataset',help="path to Dataset",required=True)
     parser.add_argument("--dataset", choices=['voc2012','cityscapes'], type=str, help="dataset name",required=True)
-    parser.add_argument("--num_classes", type=int, default=None,help="num classes (default: None)")
+    parser.add_argument("--num_classes", type=int, default=None, help="num classes (default: None)")
 
     available_models = sorted(name for name in models.model.__dict__ if name.islower() and \
                               not (name.startswith("__") or name.startswith('_')) and callable(
                               models.model.__dict__[name])
                               )
     # Model Options
-    parser.add_argument("--model", choices=available_models, type=str, help="model name",required=True)
+    parser.add_argument("--model", choices=available_models, default="deeplabv3plus_resnet50", type=str, help="model name",required=True)
     parser.add_argument("--output_stride", type=int, default=16, choices=[8, 16])
 
     # Train Options
@@ -113,8 +110,8 @@ def main():
     data_dir = os.path.join(root_dir,"dataset")
     log_dir = os.path.join(root_dir,"logs")
     os.makedirs(log_dir,exist_ok=True)
-    log_dir = os.path.join(log_dir,f'{kargs['model']}_{kargs['dataset']}')
-    ckpt_dir = os.path.join(root_dir,"checkpoint",f'{kargs['model']}_{kargs['dataset']}')
+    log_dir = os.path.join(log_dir,f"{kargs['model']}_{kargs['dataset']}")
+    ckpt_dir = os.path.join(root_dir,"checkpoint",f"{kargs['model']}_{kargs['dataset']}")
 
     # DataLoader
     train_ds, val_ds= get_dataset(data_dir,kargs)
@@ -185,7 +182,7 @@ def main():
                         save(ckpt_dir,model,optim,lr_scheduler,cur_iter,best_score,time,"model_best.pth")
                     writer_val.add_scalar('Mean Acc',val_score['Mean Acc'],cur_iter)
                     writer_val.add_scalar('mIOU',val_score['Mean IoU'],cur_iter)
-                    if cur_iter % 1000 == 0
+                    if cur_iter % 1000 == 0:
                         fig = make_figure(images.detach().cpu(),targets.cpu(),outputs.detach().cpu(),colormap)
                         iou_bar = make_iou_bar(np.nan_to_num(val_score['Class IoU']))
                         writer_val.add_figure('Images',fig,cur_iter)

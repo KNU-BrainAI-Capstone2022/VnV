@@ -1,6 +1,7 @@
-from .utils import IntermediateLayerGetter
+from .utils import IntermediateLayerGetter, _SimpleSegmentationModel
 from .deeplab import DeepLabHead, DeepLabHeadV3Plus, DeepLabV3
 from .backbone import resnet
+from .fcn import FCN8
 
 def _segm_resnet(name, backbone_name, num_classes, output_stride, pretrained_backbone):
 
@@ -29,14 +30,30 @@ def _segm_resnet(name, backbone_name, num_classes, output_stride, pretrained_bac
     model = DeepLabV3(backbone, classifier)
     return model
 
-def _load_model(arch_type, backbone, num_classes, output_stride, pretrained_backbone):
+def _fcn_resnet(name, backbone_name, num_classes,pretrained_backbone):
+    backbone = resnet.__dict__[backbone_name](
+        pretrained=pretrained_backbone
+    )
+    return_layers = {'layer2': 'layer2', 'layer3': 'layer3', 'layer4': 'layer4'}
+    classifier = FCN8(num_classes)
+    backbone = IntermediateLayerGetter(backbone,return_layers=return_layers)
 
-    if backbone=='mobilenetv2':
-        model = _segm_mobilenet(arch_type, backbone, num_classes, output_stride=output_stride, pretrained_backbone=pretrained_backbone)
-    elif backbone.startswith('resnet'):
-        model = _segm_resnet(arch_type, backbone, num_classes, output_stride=output_stride, pretrained_backbone=pretrained_backbone)
+    model = _SimpleSegmentationModel(backbone,classifier)
+
+    return model
+
+def _load_model(arch_type, backbone, num_classes, output_stride, pretrained_backbone):
+    if arch_type =='fcn':
+        if backbone.startswith('resnet'):
+            model = _fcn_resnet(arch_type, backbone,num_classes,pretrained_backbone)
+        else:
+            raise NotImplementedError
+
     else:
-        raise NotImplementedError
+        if backbone.startswith('resnet'):
+            model = _segm_resnet(arch_type, backbone, num_classes, output_stride=output_stride, pretrained_backbone=pretrained_backbone)
+        else:
+            raise NotImplementedError
     return model
 
 def deeplabv3_resnet50(num_classes=21, output_stride=8, pretrained_backbone=True):
@@ -75,3 +92,19 @@ def deeplabv3plus_resnet101(num_classes=21, output_stride=8, pretrained_backbone
         pretrained_backbone (bool): If True, use the pretrained backbone.
     """
     return _load_model('deeplabv3plus', 'resnet101', num_classes, output_stride=output_stride, pretrained_backbone=pretrained_backbone)
+
+def fcn_resnet50(num_classes=21, output_stride=8, pretrained_backbone=True):
+    """Constructs a FCN model with a ResNet-50 backbone.
+    Args:
+        num_classes (int): number of classes.
+        pretrained_backbone (bool): If True, use the pretrained backbone.
+    """
+    return _load_model('fcn','resnet50', num_classes, output_stride=output_stride, pretrained_backbone=pretrained_backbone)
+
+def fcn_resnet101(num_classes=21, output_stride=8, pretrained_backbone=True):
+    """Constructs a FCN model with a ResNet-101 backbone.
+    Args:
+        num_classes (int): number of classes.
+        pretrained_backbone (bool): If True, use the pretrained backbone.
+    """
+    return _load_model('fcn','resnet101', num_classes, output_stride=output_stride, pretrained_backbone=pretrained_backbone)
