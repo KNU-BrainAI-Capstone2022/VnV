@@ -3,40 +3,54 @@ import torch
 import torchvision
 import numpy as np
 import matplotlib.pyplot as plt
-
+# -------------------------- Model -----------------------------------
 # 모델 저장 함수
-def save(ckpt_dir,model,optim,epoch,best_val=0,time,filename="model_epoch"):
+def save(ckpt_dir,model,optim,lr_scheduler,cur_iter,best_score,time,filename):
     if not os.path.exists(ckpt_dir):
         os.mkdir(ckpt_dir)
-    if filename == "model_epoch":
-        filepath = os.path.join(ckpt_dir,f"model_epoch{epoch}.pth")
-    else:
-        filepath = os.path.join(ckpt_dir,filename)
-    torch.save({'model':model.state_dict(),
-                'optim':optim.state_dict(),
-                'epoch':epoch,
-                'best_val':best_val,
-                'time':time},filepath)
+    filepath = os.path.join(ckpt_dir,filename)
+    torch.save({
+        'model_state':model.state_dict(),
+        'optim_state':optim.state_dict(),
+        "lr_scheduler_state": scheduler.state_dict(),
+        'cur_iter':cur_iter,
+        'best_score':best_score,
+        'time':time
+        },filepath)
+    print("Model saved as %s" % filepath)
 
 # 모델 로드 함수
-def load(ckpt_dir,name,model,optim):
-    ckpt = os.path.join(ckpt_dir,name)
+def load(ckpt_dir,model,optim,lr_scheduler,kargs):
     if not os.path.exists(ckpt):
-        epoch = 0
-        best_val = 0
+        cur_iter = 0
+        best_score = 0
         time = 0
         print("There is no checkpoint")
-        return model,optim,epoch,best_val,time
+        return model,optim,lr_scheduler,cur_iter,best_score,time
+    
+    if kargs['resume'] == True:
+        ckpt = os.path.join(ckpt_dir,"model_last.pth")
+
+    elif kargs['test_only'] == True:
+        ckpt = os.path.join(ckpt_dir,"model_best.pth")
+    else:
+        cur_iter = 0
+        best_score = 0
+        time = 0
+        return model,optim,lr_scheduler,cur_iter,best_score,time
 
     dict_model = torch.load(ckpt)
-
     model.load_state_dict(dict_model['model'])
     optim.load_state_dict(dict_model['optim'])
-    epoch = dict_model['epoch']
-    best_val = dict_model['best_val']
+    lr_scheduler.load_state_dict(dict_model['lr_scheduler'])
+    cur_iter = dict_model['cur_iter']
+    best_score = dict_model['best_score']
     time = dict_model['time']
-    return model,optim,epoch,best_val,time
+    print("Model restored from %s" % ckpt)
+    return model,optim,lr_scheduler,cur_iter,best_score,time
+# -------------------------- Model -----------------------------------
 
+# -------------------------- Metric / Result -----------------------------------
 def mask_colorize(masks,cmap):
     # masks : BxCxHxW
     # if C != 1, argmax
@@ -92,8 +106,61 @@ def intersection_union(output:torch.Tensor,target:torch.Tensor,c:int,ignore_inde
     area_union = area_output + area_target - area_intersection
     return area_intersection.detach().cpu().numpy(),area_union.detach().cpu().numpy()
 
-def make_iou_bar(iou,classes):
-    fig = plt.figure(figsize=(len(classes),len(classes)//3))
-    plt.bar(range(len(classes)),iou,width=0.5,tick_label=classes)
+def make_iou_bar(cls_iou):
+    fig = plt.figure()
+    plt.bar(range(len(cls_iou)),cls_iou)
     fig.suptitle("IOU per Class")
     return fig
+
+class SegMetrics(object):
+    """
+    Stream Metrics for Semantic Segmentation Task
+    """
+    def __init__(self, num_classes):
+        self.num_classes = num_classes
+        self.confusion_matrix = np.zeros((num_classes, num_classes))
+
+    def update(self, label_trues, label_preds):
+        for lt, lp in zip(label_trues, label_preds):
+            self.confusion_matrix += self._fast_hist( lt.flatten(), lp.flatten() )
+    
+    @staticmethod
+    def to_str(results):
+        string = "\n"
+        for k, v in results.items():
+            if k!="Class IoU":
+                string += "%s: %f\n"%(k, v)
+        return string
+
+    def _fast_hist(self, label_true, label_pred):
+        mask = (label_true >= 0) & (label_true < self.num_classes)
+        hist = np.bincount(
+            self.num_classes * label_true[mask].astype(int) + label_pred[mask],
+            minlength=self.num_classes ** 2,
+        ).reshape(self.num_classes, self.num_classes)
+        return hist
+
+    def get_results(self):
+        """Returns accuracy score evaluation result.
+            - overall accuracy
+            - mean accuracy
+            - mean iou
+            - class iou
+        """
+        hist = self.confusion_matrix
+        acc = np.diag(hist).sum() / hist.sum()
+        acc_cls = np.diag(hist) / hist.sum(axis=1)
+        acc_cls = np.nanmean(acc_cls)
+        iou = np.diag(hist) / (hist.sum(axis=1) + hist.sum(axis=0) - np.diag(hist))
+        mean_iou = np.nanmean(iou)
+        cls_iou = dict(zip(range(self.num_classes), iou))
+
+        return {
+                "Overall Acc": acc,
+                "Mean Acc": acc_cls,
+                "Mean IoU": mean_iou,
+                "Class IoU": cls_iou,
+            }
+        
+    def reset(self):
+        self.confusion_matrix = np.zeros((self.num_classes, self.num_classes))
