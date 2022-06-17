@@ -110,7 +110,9 @@ def main():
     log_dir = os.path.join(root_dir,"logs")
     os.makedirs(log_dir,exist_ok=True)
     log_dir = os.path.join(log_dir,f"{kargs['model']}_{kargs['dataset']}")
-    ckpt_dir = os.path.join(root_dir,"checkpoint",f"{kargs['model']}_{kargs['dataset']}")
+    ckpt_dir = os.path.join(root_dir,"checkpoint")
+    os.makedirs(ckpt_dir,exist_ok=True)
+    ckpt_dir = os.path.join(ckpt_dir,f"{kargs['model']}_{kargs['dataset']}")
 
     # DataLoader
     train_ds, val_ds= get_dataset(data_dir,kargs)
@@ -135,7 +137,7 @@ def main():
         lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=kargs['step_size'], gamma=0.1)
 
     # Load Checkpoint
-    model, optimizer, lr_scheduler, cur_iter, best_score, time_offset = load(ckpt_dir,model,optimizer,lr_scheduler,kargs)
+    model, optimizer, lr_scheduler, cur_iter, best_score, = load(ckpt_dir,model,optimizer,lr_scheduler,kargs)
     # Metric
     metrics = SegMetrics(kargs['num_classes'])
     # Test-only
@@ -177,10 +179,10 @@ def main():
                     model.eval()
                     val_score = validate(model,dataloaders['val'],metrics,device,kargs)
                     print(metrics.to_str(val_score))
-                    save(ckpt_dir,model,optimizer,lr_scheduler,cur_iter,best_score,time,"model_last.pth")
+                    save(ckpt_dir,model,optimizer,lr_scheduler,cur_iter,best_score,"model_last.pth")
                     if val_score['Mean IoU'] > best_score:  # save best model
                         best_score = val_score['Mean IoU']
-                        save(ckpt_dir,model,optimizer,lr_scheduler,cur_iter,best_score,time,"model_best.pth")
+                        save(ckpt_dir,model,optimizer,lr_scheduler,cur_iter,best_score,"model_best.pth")
                     writer_val.add_scalar('Mean Acc',val_score['Mean Acc'],cur_iter)
                     writer_val.add_scalar('mIOU',val_score['Mean IoU'],cur_iter)
                     if cur_iter % 1 == 0:
