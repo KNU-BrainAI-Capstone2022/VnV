@@ -218,6 +218,7 @@ def get_dataset(dir_path,karg):
             ToTensor(),
             Normalize((0.485,0.456,0.406),(0.229,0.224,0.225)),
             RandomCrop(karg['crop_size']),
+            ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5),
             RandomHorizontalFlip(),
         ])
         val_transform = Compose([
