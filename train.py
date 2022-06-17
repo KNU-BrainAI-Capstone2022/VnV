@@ -10,13 +10,13 @@ import torchvision
 from torch.utils.data import DataLoader
 
 import models
-import utils
+from utils import get_dataset,make_figure,make_iou_bar,save,load,SegMetrics
 
 def get_args():
 
     parser = argparse.ArgumentParser(description="PyTorch Segmentation Training")
     # Dataset Options
-    parser.add_argument("--data_root", type=str, default='./dataset',help="path to Dataset",required=True)
+    parser.add_argument("--data_root", type=str, default='./dataset',help="path to Dataset")
     parser.add_argument("--dataset", choices=['voc2012','cityscapes'], type=str, help="dataset name",required=True)
     parser.add_argument("--num_classes", type=int, default=None, help="num classes (default: None)")
 
@@ -31,13 +31,13 @@ def get_args():
     # Train Options
     parser.add_argument("--test_only",action="store_true",help="Only test the model")
     parser.add_argument("--save_results", action='store_true', default=False,help="save segmentation results")
-    parser.add_argument("--total_iters", default=3e5, type=int, help="number of total iterations to run (default: 30k)")
+    parser.add_argument("--total_iters", default=30000, type=int, help="number of total iterations to run (default: 30k)")
     parser.add_argument("-j", "--num_workers", default=0, type=int, help="number of data loading workers (default: 0)")
     parser.add_argument("--batch_size", default=8, type=int, help="images per gpu")
     parser.add_argument("--val_batch_size", default=8, type=int, help="images per gpu")
     parser.add_argument("--lr", default=1e-2, type=float, help="initial learning rate")
     parser.add_argument("--lr_scheduler", type=str, default='exp', choices=['exp', 'step'],help="learning rate scheduler policy")
-    parser.add_argument("--step_size", type=int, default=1e4,help="(default: 10k)")
+    parser.add_argument("--step_size", type=int, default=10000,help="(default: 10k)")
     parser.add_argument("--weight_decay",default=1e-4,type=float,help="weight_decay")
     parser.add_argument("--crop_size", default=512, type=int, help="input image crop size")
     parser.add_argument("--resume", action='store_true', default=False)
@@ -46,21 +46,20 @@ def get_args():
 
     return parser.parse_args()
 
-def validate(args,model,dataloader,device,kargs):
+def validate(model,dataloader,metrics,device,kargs):
     metrics.reset()
-    model.eval()
     if kargs['save_results']:
         if not os.path.exists('results'):
             os.mkdir('results')
     img_id = 0
     with torch.no_grad():
-        for batch, data in tqdm(enumerate(dataloader)):
+        for data in tqdm(dataloader):
             images = data['image'].to(device, dtype=torch.float32)
-            labels = label['target'].to(device, dtype=torch.long)
-
+            targets = data['target'].squeeze(1).to(device, dtype=torch.long)
             outputs = model(images)
+
             preds = outputs.detach().max(dim=1)[1].cpu().numpy()
-            targets = labels.cpu().numpy()
+            targets = targets.cpu().numpy()
 
             metrics.update(targets, preds)
 
@@ -140,9 +139,10 @@ def main():
     # Metric
     metrics = SegMetrics(kargs['num_classes'])
     # Test-only
-    if args.test_only:
+    if kargs['test_only']:
         start=time.time()
-        val_score = validate(model,criterion,dataloaders['val'],metrics,device,kargs)
+        model.eval()
+        val_score = validate(model,dataloaders['val'],metrics,device,kargs)
         end = time.time()
         print(metrics.to_str(val_score))
         print(f"Average Inference Time : {(end-start)/len(val_ds)}")
@@ -157,10 +157,10 @@ def main():
             model.train()
             epoch += 1
             interval_loss = 0.0
-            for batch, data in enumerate(dataloader,1):
+            for data in tqdm(dataloaders['train']):
                 cur_iter += 1
                 images = data['image'].to(device,dtype=torch.float32)
-                targets = data['target'].to(device,dtype=torch.long)
+                targets = data['target'].squeeze(1).to(device,dtype=torch.long)
                 outputs = model(images)
 
                 optimizer.zero_grad()
@@ -170,19 +170,20 @@ def main():
                 # Metric
                 interval_loss += loss.detach().cpu().numpy()
                 # Tensorboard
-                writer_train.add_scalar('loss',loss_mean,cur_iter)
                 if cur_iter % kargs['print_interval'] == 0:
-                    print("EPOCH {epoch} | ITERATION {cur_iter} / {kargs['total_iters']} | LOSS {interval_loss / 10:.4f}")
+                    print(f"EPOCH {epoch} | ITERATION {cur_iter} / {kargs['total_iters']:d} | LOSS {interval_loss / 10:.4f}")
+                    writer_train.add_scalar('loss',interval_loss,cur_iter)
                 if cur_iter % kargs['val_interval'] == 0:
-                    val_score = validate(model,criterion,dataloaders['val'],metrics,device,kargs)
+                    model.eval()
+                    val_score = validate(model,dataloaders['val'],metrics,device,kargs)
                     print(metrics.to_str(val_score))
-                    save(ckpt_dir,model,optim,lr_scheduler,cur_iter,best_score,time,"model_last.pth")
+                    save(ckpt_dir,model,optimizer,lr_scheduler,cur_iter,best_score,time,"model_last.pth")
                     if val_score['Mean IoU'] > best_score:  # save best model
                         best_score = val_score['Mean IoU']
-                        save(ckpt_dir,model,optim,lr_scheduler,cur_iter,best_score,time,"model_best.pth")
+                        save(ckpt_dir,model,optimizer,lr_scheduler,cur_iter,best_score,time,"model_best.pth")
                     writer_val.add_scalar('Mean Acc',val_score['Mean Acc'],cur_iter)
                     writer_val.add_scalar('mIOU',val_score['Mean IoU'],cur_iter)
-                    if cur_iter % 1000 == 0:
+                    if cur_iter % 1 == 0:
                         fig = make_figure(images.detach().cpu(),targets.cpu(),outputs.detach().cpu(),colormap)
                         iou_bar = make_iou_bar(np.nan_to_num(val_score['Class IoU']))
                         writer_val.add_figure('Images',fig,cur_iter)

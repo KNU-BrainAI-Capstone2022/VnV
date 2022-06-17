@@ -21,22 +21,21 @@ def save(ckpt_dir,model,optim,lr_scheduler,cur_iter,best_score,time,filename):
 
 # 모델 로드 함수
 def load(ckpt_dir,model,optim,lr_scheduler,kargs):
-    if not os.path.exists(ckpt):
-        cur_iter = 0
-        best_score = 0
-        time = 0
-        print("There is no checkpoint")
-        return model,optim,lr_scheduler,cur_iter,best_score,time
-    
     if kargs['resume'] == True:
         ckpt = os.path.join(ckpt_dir,"model_last.pth")
-
     elif kargs['test_only'] == True:
         ckpt = os.path.join(ckpt_dir,"model_best.pth")
     else:
         cur_iter = 0
         best_score = 0
         time = 0
+        return model,optim,lr_scheduler,cur_iter,best_score,time
+
+    if not os.path.exists(ckpt):
+        cur_iter = 0
+        best_score = 0
+        time = 0
+        print("There is no checkpoint")
         return model,optim,lr_scheduler,cur_iter,best_score,time
 
     dict_model = torch.load(ckpt)
