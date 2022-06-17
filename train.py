@@ -186,8 +186,7 @@ def main():
                     writer_val.add_scalar('Mean Acc',val_score['Mean Acc'],cur_iter)
                     writer_val.add_scalar('mIOU',val_score['Mean IoU'],cur_iter)
                     if cur_iter % 1000 == 0
-                        fig = make_figure(images,targets,outputs,colormap)
-                        iou = total_intersection / total_union
+                        fig = make_figure(images.detach().cpu(),targets.cpu(),outputs.detach().cpu(),colormap)
                         iou_bar = make_iou_bar(np.nan_to_num(val_score['Class IoU']))
                         writer_val.add_figure('Images',fig,cur_iter)
                         writer_val.add_figure('IOU',iou_bar,cur_iter)
