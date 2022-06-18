@@ -38,13 +38,15 @@ def _fcn_resnet(name, backbone_name, num_classes,pretrained_backbone):
     aux_inplanes = 1024
 
     return_layers = {'layer2':'layer2','layer3': 'layer3', 'layer4': 'layer4'}
-    # classifier = FCNHead(inplanes,num_classes)
-    # aux_classifier = FCNHead(aux_inplanes,num_classes)
+    classifier = FCNHead(inplanes,num_classes)
+    aux_classifier = FCNHead(aux_inplanes,num_classes)
     
     backbone = IntermediateLayerGetter(backbone,return_layers=return_layers)
-    classifier = FCN8(inplanes,num_classes)
+
     #model = FCN(backbone,classifier,aux_classifier)
-    model = FCN(backbone, classifier)
+
+    classifier = FCN8(inplanes,num_classes)
+    model = _SimpleSegmentationModel(backbone, classifier)
 
     return model
 
