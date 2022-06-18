@@ -94,15 +94,12 @@ class FCN8(nn.Module):
         pool3 = features['layer2']
         pool4 = features['layer3']
         pool5 = features['layer4']
-        print(pool3.shape,pool4.shape,pool5.shape)
 
         pool5 = self.classifier3(pool5)
-        print(pool5.shape)
+
         # 1/32 *2 + 1/16
         pool5 = self.upsample2(pool5)
         pool4 = self.project2(pool4)
-        print(pool5.shape)
-        print(pool4.shape)
         x = pool5 + pool4
         
         # 1/16 *2 + 1/8
