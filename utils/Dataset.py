@@ -5,7 +5,7 @@ from PIL import Image
 import torch
 from collections import namedtuple
 from torchvision.transforms import Compose
-from .Transform import *
+from Transform import *
 
 class CustomVOCSegmentation(torch.utils.data.Dataset):
     def __init__(self, data_dir, image_set="train", transform=None):
@@ -207,9 +207,10 @@ def get_dataset(dir_path,karg):
             
         ])
         val_transform = Compose([
+            Resize(512),
             ToTensor(),
             Normalize((0.485,0.456,0.406),(0.229,0.224,0.225)),
-            Resize(512),
+            
         ])
 
         train_dataset = CustomVOCSegmentation(data_dir=dir_path,
