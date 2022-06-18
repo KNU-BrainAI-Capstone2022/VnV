@@ -1,2 +1,2 @@
-from .Util import make_figure,make_iou_bar,save,load,SegMetrics
+from .Util import *
 from .Dataset import get_dataset

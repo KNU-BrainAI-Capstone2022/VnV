@@ -3,19 +3,20 @@ import torch
 import torchvision
 import numpy as np
 import matplotlib.pyplot as plt
+
+from torchvision.transforms.functional import normalize
 # -------------------------- Model -----------------------------------
 # 모델 저장 함수
-def save(ckpt_dir,model,optim,lr_scheduler,cur_iter,best_score,time,filename):
+def save(ckpt_dir,model,optim,lr_scheduler,cur_iter,best_score,filename):
     if not os.path.exists(ckpt_dir):
         os.mkdir(ckpt_dir)
     filepath = os.path.join(ckpt_dir,filename)
     torch.save({
+        'cur_iter':cur_iter,
         'model_state':model.state_dict(),
         'optim_state':optim.state_dict(),
-        "lr_scheduler_state": scheduler.state_dict(),
-        'cur_iter':cur_iter,
+        "lr_scheduler_state": lr_scheduler.state_dict(),
         'best_score':best_score,
-        'time':time
         },filepath)
     print("Model saved as %s" % filepath)
 
@@ -28,28 +29,37 @@ def load(ckpt_dir,model,optim,lr_scheduler,kargs):
     else:
         cur_iter = 0
         best_score = 0
-        time = 0
-        return model,optim,lr_scheduler,cur_iter,best_score,time
+        return model,optim,lr_scheduler,cur_iter,best_score
 
     if not os.path.exists(ckpt):
         cur_iter = 0
         best_score = 0
-        time = 0
         print("There is no checkpoint")
-        return model,optim,lr_scheduler,cur_iter,best_score,time
+        return model,optim,lr_scheduler,cur_iter,best_score
 
     dict_model = torch.load(ckpt)
-    model.load_state_dict(dict_model['model'])
-    optim.load_state_dict(dict_model['optim'])
-    lr_scheduler.load_state_dict(dict_model['lr_scheduler'])
+    model.load_state_dict(dict_model['model_state'])
+    optim.load_state_dict(dict_model['optim_state'])
+    lr_scheduler.load_state_dict(dict_model['lr_scheduler_state'])
     cur_iter = dict_model['cur_iter']
     best_score = dict_model['best_score']
-    time = dict_model['time']
     print("Model restored from %s" % ckpt)
-    return model,optim,lr_scheduler,cur_iter,best_score,time
+    return model,optim,lr_scheduler,cur_iter,best_score
 # -------------------------- Model -----------------------------------
 
 # -------------------------- Metric / Result -----------------------------------
+class Denormalize(object):
+    def __init__(self, mean, std):
+        mean = np.array(mean)
+        std = np.array(std)
+        self._mean = -mean/std
+        self._std = 1/std
+
+    def __call__(self, tensor):
+        if isinstance(tensor, np.ndarray):
+            return (tensor - self._mean.reshape(-1,1,1)) / self._std.reshape(-1,1,1)
+        return normalize(tensor, self._mean, self._std)
+
 def mask_colorize(masks,cmap):
     # masks : BxCxHxW
     # if C != 1, argmax
@@ -72,7 +82,7 @@ def make_figure(images,targets,outputs,colormap):
         targets = targets.unsqueeze(1)
     n=images.size(0)
     fig, ax = plt.subplots(3,1,figsize=(n*3,9))
-    ax[0].imshow(torchvision.utils.make_grid(images.cpu(), normalize=True).permute(1,2,0))
+    ax[0].imshow(torchvision.utils.make_grid(images.cpu(), normalize=False).permute(1,2,0))
     ax[0].set_title("Input")
     ax[0].axis('off')
     targets = mask_colorize(targets,colormap)
