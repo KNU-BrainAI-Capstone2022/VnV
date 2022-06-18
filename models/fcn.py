@@ -49,7 +49,7 @@ class FCN8(nn.Module):
         pro_channel2 = in_channels //2
         
         self.project1 = nn.Sequential(
-            nn.Conv2d(pro_channell,256,kernel_size=3,padding=1,bias=False),
+            nn.Conv2d(pro_channell,256,kernel_size=1,bias=False),
             nn.BatchNorm2d(256),
             nn.ReLU(),
             nn.Dropout(0.1),
@@ -57,7 +57,7 @@ class FCN8(nn.Module):
         )
 
         self.project2 = nn.Sequential(
-            nn.Conv2d(pro_channel2,512,kernel_size=3,padding=1,bias=False),
+            nn.Conv2d(pro_channel2,512,kernel_size=1,bias=False),
             nn.BatchNorm2d(512),
             nn.ReLU(),
             nn.Dropout(0.1),
@@ -65,7 +65,7 @@ class FCN8(nn.Module):
         )
 
         self.classifier3 = nn.Sequential(
-            nn.Conv2d(in_channels,512,3,1,bias=False),
+            nn.Conv2d(in_channels,512,kernel_size=1,bias=False),
             nn.BatchNorm2d(512),
             nn.ReLU(),
             nn.Dropout(0.1),
@@ -94,7 +94,8 @@ class FCN8(nn.Module):
         pool3 = features['layer2']
         pool4 = features['layer3']
         pool5 = features['layer4']
-        
+        print(pool3.shape,pool4.shape,pool5.shape)
+
         pool5 = self.classifier3(pool5)
         print(pool5.shape)
         # 1/32 *2 + 1/16
