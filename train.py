@@ -10,7 +10,7 @@ import torchvision
 from torch.utils.data import DataLoader
 
 import models
-from utils import get_dataset,make_figure,make_iou_bar,save,load,SegMetrics
+from utils import get_dataset,make_figure,make_iou_bar,save,load,SegMetrics,Denormalize
 
 def get_args():
 
@@ -36,7 +36,7 @@ def get_args():
     parser.add_argument("--batch_size", default=8, type=int, help="images per gpu")
     parser.add_argument("--val_batch_size", default=8, type=int, help="images per gpu")
     parser.add_argument("--lr", default=1e-2, type=float, help="initial learning rate")
-    parser.add_argument("--lr_scheduler", type=str, default='exp', choices=['exp', 'step'],help="learning rate scheduler policy")
+    parser.add_argument("--lr_scheduler", type=str, default='step', choices=['exp', 'step'],help="learning rate scheduler policy")
     parser.add_argument("--step_size", type=int, default=10000,help="(default: 10k)")
     parser.add_argument("--weight_decay",default=1e-4,type=float,help="weight_decay")
     parser.add_argument("--crop_size", default=512, type=int, help="input image crop size")
@@ -51,6 +51,7 @@ def validate(model,dataloader,metrics,device,kargs):
     if kargs['save_results']:
         if not os.path.exists('results'):
             os.mkdir('results')
+    denorm = Denormalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     img_id = 0
     with torch.no_grad():
         for data in tqdm(dataloader):
@@ -62,7 +63,7 @@ def validate(model,dataloader,metrics,device,kargs):
             targets = targets.cpu().numpy()
 
             metrics.update(targets, preds)
-
+            break
             if kargs['save_results']:
                 for i in range(len(images)):
                     image = images[i].detach().cpu().numpy()
@@ -152,6 +153,8 @@ def main():
         # Tensorboard
         writer_train = SummaryWriter(log_dir=os.path.join(log_dir,"train"))
         writer_val = SummaryWriter(log_dir=os.path.join(log_dir,"val"))
+        # Denormalize for Input Images
+        denorm = Denormalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
         # Train log
         start_time = time.time()
         epoch = 0
@@ -173,8 +176,10 @@ def main():
                 interval_loss += loss.detach().cpu().numpy()
                 # Tensorboard
                 if cur_iter % kargs['print_interval'] == 0:
-                    print(f"EPOCH {epoch} | ITERATION {cur_iter} / {kargs['total_iters']:d} | LOSS {interval_loss / 10:.4f}")
+                    interval_loss = interval_loss / kargs['print_interval']
+                    print(f"EPOCH {epoch} | ITERATION {cur_iter} / {kargs['total_iters']:d} | LOSS {interval_loss:.4f}")
                     writer_train.add_scalar('loss',interval_loss,cur_iter)
+                    interval_loss = 0.0
                 if cur_iter % kargs['val_interval'] == 0:
                     model.eval()
                     val_score = validate(model,dataloaders['val'],metrics,device,kargs)
@@ -186,7 +191,10 @@ def main():
                     writer_val.add_scalar('Mean Acc',val_score['Mean Acc'],cur_iter)
                     writer_val.add_scalar('mIOU',val_score['Mean IoU'],cur_iter)
                     if cur_iter % 1 == 0:
-                        fig = make_figure(images.detach().cpu(),targets.cpu(),outputs.detach().cpu(),colormap)
+                        images = images.detach().cpu()
+                        print(images.min(),images.max())
+                        print(denorm(images).min(),denorm(images).max())
+                        fig = make_figure(denorm(images.detach().cpu())*255,targets.cpu(),outputs.detach().cpu(),colormap)
                         iou_bar = make_iou_bar(np.nan_to_num(val_score['Class IoU']))
                         writer_val.add_figure('Images',fig,cur_iter)
                         writer_val.add_figure('IOU',iou_bar,cur_iter)

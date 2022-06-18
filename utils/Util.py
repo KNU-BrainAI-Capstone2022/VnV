@@ -3,6 +3,8 @@ import torch
 import torchvision
 import numpy as np
 import matplotlib.pyplot as plt
+
+from torchvision.transforms.functional import normalize
 # -------------------------- Model -----------------------------------
 # 모델 저장 함수
 def save(ckpt_dir,model,optim,lr_scheduler,cur_iter,best_score,filename):
@@ -46,6 +48,18 @@ def load(ckpt_dir,model,optim,lr_scheduler,kargs):
 # -------------------------- Model -----------------------------------
 
 # -------------------------- Metric / Result -----------------------------------
+class Denormalize(object):
+    def __init__(self, mean, std):
+        mean = np.array(mean)
+        std = np.array(std)
+        self._mean = -mean/std
+        self._std = 1/std
+
+    def __call__(self, tensor):
+        if isinstance(tensor, np.ndarray):
+            return (tensor - self._mean.reshape(-1,1,1)) / self._std.reshape(-1,1,1)
+        return normalize(tensor, self._mean, self._std)
+
 def mask_colorize(masks,cmap):
     # masks : BxCxHxW
     # if C != 1, argmax
@@ -68,7 +82,7 @@ def make_figure(images,targets,outputs,colormap):
         targets = targets.unsqueeze(1)
     n=images.size(0)
     fig, ax = plt.subplots(3,1,figsize=(n*3,9))
-    ax[0].imshow(torchvision.utils.make_grid(images.cpu(), normalize=True).permute(1,2,0))
+    ax[0].imshow(torchvision.utils.make_grid(images.cpu(), normalize=False).permute(1,2,0))
     ax[0].set_title("Input")
     ax[0].axis('off')
     targets = mask_colorize(targets,colormap)
