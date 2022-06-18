@@ -12,6 +12,7 @@ class ToTensor(object):
     [0, 255] to a torch.FloatTensor of shape (C x H x W) in the range [0.0, 1.0].
     """
     def __call__(self, data):
+       
         data['image'] = F.to_tensor(data['image'])
 
         data['target'] = torch.from_numpy(np.array(data['target'],dtype=np.uint8))
