@@ -1,7 +1,7 @@
 from .utils import IntermediateLayerGetter, _SimpleSegmentationModel
 from .deeplab import DeepLabHead, DeepLabHeadV3Plus, DeepLabV3
 from .backbone import resnet
-from .fcn import FCN8
+from .fcn import FCN,FCNHead,FCN8
 
 def _segm_resnet(name, backbone_name, num_classes, output_stride, pretrained_backbone):
 
@@ -34,11 +34,17 @@ def _fcn_resnet(name, backbone_name, num_classes,pretrained_backbone):
     backbone = resnet.__dict__[backbone_name](
         pretrained=pretrained_backbone
     )
-    return_layers = {'layer2': 'layer2', 'layer3': 'layer3', 'layer4': 'layer4'}
-    classifier = FCN8(num_classes)
-    backbone = IntermediateLayerGetter(backbone,return_layers=return_layers)
+    inplanes = 2048
+    aux_inplanes = 1024
 
-    model = _SimpleSegmentationModel(backbone,classifier)
+    return_layers = {'layer2':'layer2','layer3': 'layer3', 'layer4': 'layer4'}
+    # classifier = FCNHead(inplanes,num_classes)
+    # aux_classifier = FCNHead(aux_inplanes,num_classes)
+    
+    backbone = IntermediateLayerGetter(backbone,return_layers=return_layers)
+    classifier = FCN8(inplanes,num_classes)
+    #model = FCN(backbone,classifier,aux_classifier)
+    model = FCN(backbone, classifier)
 
     return model
 
