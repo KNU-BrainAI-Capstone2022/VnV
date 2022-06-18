@@ -1,14 +1,74 @@
 import os
 import torch
 from torch import nn
-import utils
+from torch.nn import functional as F
+
+class FCN(nn.Module):
+    def __init__(self,backbone,classifier,aux_classifier=None):
+        super().__init__()
+        self.backbone = backbone
+        self.classifier = classifier
+        self.aux_classifier = aux_classifier
+    
+    def forward(self, x):
+        input_shape = x.shape[-2:]
+        features = self.backbone(x)
+
+        x = self.classifier(features)
+        result = F.interpolate(x,size=input_shape, mode='bilinear', align_corners=False)
+
+        if self.aux_classifier is not None:
+            x = features['layer4']
+            x = self.classifier(x)
+            result = F.interpolate(x, size=input_shape, mode='bilinear', align_corners=False)
+
+            x = features['layer3']
+            x = self.aux_classifier(x)
+            b = F.interpolate(x, size=input_shape, mode='bilinear', align_corners=False)
+            result = 0.5*result+0.5*b
+        
+        return result
+
+
+class FCNHead(nn.Sequential):
+    def __init__(self,in_channels, num_class=21):
+        inter_channels = in_channels //4
+        layers= [
+            nn.Conv2d(in_channels,inter_channels,kernel_size=3,padding=1,bias=False),
+            nn.BatchNorm2d(inter_channels),
+            nn.ReLU(),
+            nn.Dropout(0.1),
+            nn.Conv2d(inter_channels,num_class,1),
+        ]
+        super().__init__(*layers)
 
 class FCN8(nn.Module):
-    # vgg 16 
-    def __init__(self,num_class=21):
+    def __init__(self,in_channels,num_class=21):
         super(FCN8, self).__init__()
+        pro_channell = in_channels //4
+        pro_channel2 = in_channels //2
+        
+        self.project1 = nn.Sequential(
+            nn.Conv2d(pro_channell,256,kernel_size=3,padding=1,bias=False),
+            nn.BatchNorm2d(256),
+            nn.ReLU(),
+            nn.Dropout(0.1),
+            nn.Conv2d(256,num_class,kernel_size=1),
+        )
+
+        self.project2 = nn.Sequential(
+            nn.Conv2d(pro_channel2,512,kernel_size=3,padding=1,bias=False),
+            nn.BatchNorm2d(512),
+            nn.ReLU(),
+            nn.Dropout(0.1),
+            nn.Conv2d(512,num_class,kernel_size=1),
+        )
 
         self.classifier3 = nn.Sequential(
+            nn.Conv2d(in_channels,512,3,1,bias=False),
+            nn.BatchNorm2d(512),
+            nn.ReLU(),
+            nn.Dropout(0.1),
             nn.Conv2d(in_channels=512,out_channels=4096,kernel_size=1),
             nn.ReLU(inplace=True),
             nn.Dropout2d(0.5),
@@ -36,18 +96,18 @@ class FCN8(nn.Module):
         pool5 = features['layer4']
         
         pool5 = self.classifier3(pool5)
-
+        print(pool5.shape)
         # 1/32 *2 + 1/16
         pool5 = self.upsample2(pool5)
-        pool4 = self.pool4_conv(pool4)
+        pool4 = self.project2(pool4)
+        print(pool5.shape)
+        print(pool4.shape)
         x = pool5 + pool4
-        x = self.relu(x)
         
         # 1/16 *2 + 1/8
         x = self.pool4_upsample2(x)
-        pool3 = self.pool3_conv(pool3)
+        pool3 = self.project1(pool3)
         x = x + pool3
-        x = self.relu(x)
 
         # 1/8 * 8 
         x = self.upsample8(x)
