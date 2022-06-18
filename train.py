@@ -42,7 +42,7 @@ def get_args():
     parser.add_argument("--crop_size", default=512, type=int, help="input image crop size")
     parser.add_argument("--resume", action='store_true', default=False)
     parser.add_argument("--print_interval", type=int, default=10,help="print interval of loss (default: 10)")
-    parser.add_argument("--val_interval", type=int, default=100,help="iteration interval for eval (default: 100)")
+    parser.add_argument("--val_interval", type=int, default=1000,help="iteration interval for eval (default: 100)")
 
     return parser.parse_args()
 
