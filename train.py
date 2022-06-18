@@ -46,7 +46,7 @@ def get_args():
 
     return parser.parse_args()
 
-def validate(model,dataloader,metrics,device,kargs):
+def validate(model,criterion,dataloader,metrics,device,kargs):
     metrics.reset()
     if kargs['save_results']:
         if not os.path.exists('results'):
@@ -54,16 +54,17 @@ def validate(model,dataloader,metrics,device,kargs):
     denorm = Denormalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     img_id = 0
     with torch.no_grad():
-        for data in tqdm(dataloader):
+        for data in dataloader:
             images = data['image'].to(device, dtype=torch.float32)
             targets = data['target'].squeeze(1).to(device, dtype=torch.long)
             outputs = model(images)
 
+            loss = criterion(outputs,targets).detach().cpu().numpy()
             preds = outputs.detach().max(dim=1)[1].cpu().numpy()
             targets = targets.cpu().numpy()
 
-            metrics.update(targets, preds)
-            break
+            metrics.update(targets, preds, loss)
+            
             if kargs['save_results']:
                 for i in range(len(images)):
                     image = images[i].detach().cpu().numpy()
@@ -145,7 +146,7 @@ def main():
     if kargs['test_only']:
         start=time.time()
         model.eval()
-        val_score = validate(model,dataloaders['val'],metrics,device,kargs)
+        val_score = validate(model,criterion,dataloaders['val'],metrics,device,kargs)
         end = time.time()
         print(metrics.to_str(val_score))
         print(f"Average Inference Time : {(end-start)/len(val_ds)}")
@@ -153,16 +154,15 @@ def main():
         # Tensorboard
         writer_train = SummaryWriter(log_dir=os.path.join(log_dir,"train"))
         writer_val = SummaryWriter(log_dir=os.path.join(log_dir,"val"))
-        # Denormalize for Input Images
-        denorm = Denormalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-        # Train log
+
+        # Train
         start_time = time.time()
         epoch = 0
         while True:
             model.train()
             epoch += 1
             interval_loss = 0.0
-            for data in tqdm(dataloaders['train']):
+            for data in dataloaders['train']:
                 cur_iter += 1
                 images = data['image'].to(device,dtype=torch.float32)
                 targets = data['target'].squeeze(1).to(device,dtype=torch.long)
@@ -182,20 +182,20 @@ def main():
                     interval_loss = 0.0
                 if cur_iter % kargs['val_interval'] == 0:
                     model.eval()
-                    val_score = validate(model,dataloaders['val'],metrics,device,kargs)
+                    print("Validation")
+                    val_score = validate(model,criterion,dataloaders['val'],metrics,device,kargs)
                     print(metrics.to_str(val_score))
                     save(ckpt_dir,model,optimizer,lr_scheduler,cur_iter,best_score,"model_last.pth")
                     if val_score['Mean IoU'] > best_score:  # save best model
                         best_score = val_score['Mean IoU']
                         save(ckpt_dir,model,optimizer,lr_scheduler,cur_iter,best_score,"model_best.pth")
-                    writer_val.add_scalar('Mean Acc',val_score['Mean Acc'],cur_iter)
+                    # writer_val.add_scalar('Mean Acc',val_score['Mean Acc'],cur_iter)
+                    writer_val.add_scalar('loss',val_score['Mean Loss'],cur_iter)
                     writer_val.add_scalar('mIOU',val_score['Mean IoU'],cur_iter)
                     if cur_iter % 1 == 0:
                         images = images.detach().cpu()
-                        print(images.min(),images.max())
-                        print(denorm(images).min(),denorm(images).max())
-                        fig = make_figure(denorm(images.detach().cpu())*255,targets.cpu(),outputs.detach().cpu(),colormap)
-                        iou_bar = make_iou_bar(np.nan_to_num(val_score['Class IoU']))
+                        fig = make_figure(images.detach().cpu(),targets.cpu(),outputs.detach().cpu(),colormap)
+                        iou_bar = make_iou_bar(np.nan_to_num(val_score['Class IoU'].values()))
                         writer_val.add_figure('Images',fig,cur_iter)
                         writer_val.add_figure('IOU',iou_bar,cur_iter)
                     model.train()
