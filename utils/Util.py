@@ -82,7 +82,7 @@ def make_figure(images,targets,outputs,colormap):
         targets = targets.unsqueeze(1)
     n=images.size(0)
     fig, ax = plt.subplots(3,1,figsize=(n*3,9))
-    ax[0].imshow(torchvision.utils.make_grid(images.cpu(), normalize=False).permute(1,2,0))
+    ax[0].imshow(torchvision.utils.make_grid(images.cpu(), normalize=True).permute(1,2,0))
     ax[0].set_title("Input")
     ax[0].axis('off')
     targets = mask_colorize(targets,colormap)
@@ -118,6 +118,7 @@ def intersection_union(output:torch.Tensor,target:torch.Tensor,c:int,ignore_inde
 def make_iou_bar(cls_iou):
     fig = plt.figure()
     plt.bar(range(len(cls_iou)),cls_iou)
+    plt.xticks(range(len(cls_iou)))
     fig.suptitle("IOU per Class")
     return fig
 
@@ -127,9 +128,11 @@ class SegMetrics(object):
     """
     def __init__(self, num_classes):
         self.num_classes = num_classes
+        self.loss = []
         self.confusion_matrix = np.zeros((num_classes, num_classes))
 
-    def update(self, label_trues, label_preds):
+    def update(self, label_trues, label_preds, loss):
+        self.loss.append(loss)
         for lt, lp in zip(label_trues, label_preds):
             self.confusion_matrix += self._fast_hist( lt.flatten(), lp.flatten() )
     
@@ -151,11 +154,13 @@ class SegMetrics(object):
 
     def get_results(self):
         """Returns accuracy score evaluation result.
+            - mean loss
             - overall accuracy
             - mean accuracy
             - mean iou
             - class iou
         """
+        mean_loss = np.mean(self.loss)
         hist = self.confusion_matrix
         acc = np.diag(hist).sum() / hist.sum()
         acc_cls = np.diag(hist) / hist.sum(axis=1)
@@ -165,6 +170,7 @@ class SegMetrics(object):
         cls_iou = dict(zip(range(self.num_classes), iou))
 
         return {
+                "Mean Loss" : mean_loss,
                 "Overall Acc": acc,
                 "Mean Acc": acc_cls,
                 "Mean IoU": mean_iou,
@@ -173,3 +179,4 @@ class SegMetrics(object):
         
     def reset(self):
         self.confusion_matrix = np.zeros((self.num_classes, self.num_classes))
+        self.loss = []
