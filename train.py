@@ -19,27 +19,27 @@ def get_args():
     parser.add_argument("--data_root", type=str, default='./dataset',help="path to Dataset")
     parser.add_argument("--dataset", choices=['voc2012','cityscapes'], type=str, help="dataset name",required=True)
     parser.add_argument("--num_classes", type=int, default=None, help="num classes (default: None)")
+    parser.add_argument("-j", "--num_workers", default=0, type=int, help="number of data loading workers (default: 0)")
+    parser.add_argument("--batch_size", default=8, type=int, help="images per gpu")
+    parser.add_argument("--val_batch_size", default=8, type=int, help="validation images per gpu")
+    parser.add_argument("--crop_size", default=512, type=int, help="input image crop size")
 
+    # Model Options
     available_models = sorted(name for name in models.model.__dict__ if name.islower() and \
                               not (name.startswith("__") or name.startswith('_')) and callable(
                               models.model.__dict__[name])
                               )
-    # Model Options
     parser.add_argument("--model", choices=available_models, default="deeplabv3plus_resnet50", type=str, help="model name",required=True)
-    parser.add_argument("--output_stride", type=int, default=16, choices=[8, 16])
+    parser.add_argument("--output_stride", type=int, default=16, choices=[8, 16]) # DeepLab Only
 
     # Train Options
     parser.add_argument("--test_only",action="store_true",help="Only test the model")
     parser.add_argument("--save_results", action='store_true', default=False,help="save segmentation results")
     parser.add_argument("--total_iters", default=30000, type=int, help="number of total iterations to run (default: 30k)")
-    parser.add_argument("-j", "--num_workers", default=0, type=int, help="number of data loading workers (default: 0)")
-    parser.add_argument("--batch_size", default=8, type=int, help="images per gpu")
-    parser.add_argument("--val_batch_size", default=8, type=int, help="images per gpu")
     parser.add_argument("--lr", default=1e-2, type=float, help="initial learning rate")
     parser.add_argument("--lr_scheduler", type=str, default='step', choices=['exp', 'step'],help="learning rate scheduler policy")
     parser.add_argument("--step_size", type=int, default=10000,help="(default: 10k)")
     parser.add_argument("--weight_decay",default=1e-4,type=float,help="weight_decay")
-    parser.add_argument("--crop_size", default=512, type=int, help="input image crop size")
     parser.add_argument("--resume", action='store_true', default=False)
     parser.add_argument("--print_interval", type=int, default=10,help="print interval of loss (default: 10)")
     parser.add_argument("--val_interval", type=int, default=100,help="iteration interval for eval (default: 100)")
@@ -200,6 +200,8 @@ def main():
                         writer_val.add_figure('IOU',iou_bar,cur_iter)
                     model.train()
             lr_scheduler.step()
+            if cur_iter > kargs['total_iters']:
+                break
         total_time = time.time() - start_time + time_offset
         writer_train.add_text("total time",str(datetime.timedelta(seconds=total_time)))
         writer_train.close()
