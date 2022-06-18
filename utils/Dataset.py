@@ -74,15 +74,6 @@ class CustomVOCSegmentation(torch.utils.data.Dataset):
         image = Image.open(os.path.join(self.path_jpeg,self.list_file[index]+'.jpg')).convert('RGB')
         target = Image.open(os.path.join(self.path_mask,self.list_file[index]+'.png'))
 
-        # image = np.array(image)
-        # target = np.array(target)
-        
-        # # if target.ndim == 2: # HxW -> CxHxW
-        # #     target = np.expand_dims(target,axis=-1)
-
-        # image = Image.fromarray(image)
-        # target = Image.fromarray(image)
-
         data = {'image':image,'target':target}
         if self.transform is not None:
             data = self.transform(data)
@@ -164,9 +155,6 @@ class CustomCityscapesSegmentation(torch.utils.data.Dataset):
 
         image = np.array(image,dtype=np.uint8)
         target = np.array(target,dtype=np.uint8)
-
-        # if target.ndim == 2: # HxW -> CxHxW
-        #     target = np.expand_dims(target,axis=-1)
         
         for l in self.classes:
             idx = target==l.id
@@ -200,7 +188,7 @@ def get_dataset(dir_path,karg):
     if karg['dataset'] =='voc2012':
         train_transform = Compose([
             Resize(512),
-            RandomCrop(crop_size=karg['crop_size'], pad_if_needed=True),
+            RandomCrop(karg['crop_size'], pad_if_needed=True),
             RandomHorizontalFlip(),
             ToTensor(),
             Normalize((0.485,0.456,0.406),(0.229,0.224,0.225)),
