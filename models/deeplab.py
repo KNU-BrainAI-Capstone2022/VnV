@@ -87,7 +87,8 @@ class AtrousSeparableConvolution(nn.Module):
         super(AtrousSeparableConvolution, self).__init__()
         self.body = nn.Sequential(
             # Separable Conv
-            nn.Conv2d( in_channels, in_channels, kernel_size=kernel_size, stride=stride, padding=padding, dilation=dilation, bias=bias, groups=in_channels ),
+            nn.Conv2d( in_channels, in_channels, kernel_size=kernel_size, 
+                    stride=stride, padding=padding, dilation=dilation, bias=bias, groups=in_channels ),
             # PointWise Conv
             nn.Conv2d( in_channels, out_channels, kernel_size=1, stride=1, padding=0, bias=bias),
         )

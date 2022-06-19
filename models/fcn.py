@@ -14,21 +14,18 @@ class FCN(nn.Module):
         input_shape = x.shape[-2:]
         features = self.backbone(x)
 
-        x = self.classifier(features)
-        result = F.interpolate(x,size=input_shape, mode='bilinear', align_corners=False)
+        x = features['layer4']
+        x = self.classifier(x)
+        result = F.interpolate(x, size=input_shape, mode='bilinear', align_corners=False)
 
         if self.aux_classifier is not None:
-            x = features['layer4']
-            x = self.classifier(x)
-            result = F.interpolate(x, size=input_shape, mode='bilinear', align_corners=False)
-
             x = features['layer3']
             x = self.aux_classifier(x)
             b = F.interpolate(x, size=input_shape, mode='bilinear', align_corners=False)
-            result = 0.5*result+0.5*b
+            result = 0.5*result +0.5*b 
         
         return result
-
+    
 
 class FCNHead(nn.Sequential):
     def __init__(self,in_channels, num_class=21):
@@ -78,13 +75,6 @@ class FCN8(nn.Module):
             nn.Conv2d(4096,num_class,kernel_size=1),
         )
 
-        self.pool4_conv = nn.Conv2d(512,21,kernel_size=1)
-        self.pool3_conv = nn.Conv2d(256,21,kernel_size=1)
-
-        self.upsample2 = nn.ConvTranspose2d(num_class,num_class,2,2,bias=False)
-        self.pool4_upsample2 = nn.ConvTranspose2d(num_class,num_class,2,2,bias=False)
-        self.upsample8 = nn.ConvTranspose2d(num_class,num_class,8,8,bias=False)
-
         self.relu    = nn.ReLU(inplace=True)
         self.dropout = nn.Dropout2d(0.5)
         self._initialize_weights()
@@ -94,24 +84,21 @@ class FCN8(nn.Module):
         pool3 = features['layer2']
         pool4 = features['layer3']
         pool5 = features['layer4']
-        print(pool3.shape,pool4.shape,pool5.shape)
 
         pool5 = self.classifier3(pool5)
-        print(pool5.shape)
+
         # 1/32 *2 + 1/16
-        pool5 = self.upsample2(pool5)
+        pool5 = F.interpolate(pool5, scale_factor=2, mode='bilinear', align_corners=False)
         pool4 = self.project2(pool4)
-        print(pool5.shape)
-        print(pool4.shape)
-        x = pool5 + pool4
-        
+        x = 0.5*pool5 + 0.5*pool4
+
         # 1/16 *2 + 1/8
-        x = self.pool4_upsample2(x)
+        x = F.interpolate(x, scale_factor=2, mode='bilinear', align_corners=False)
         pool3 = self.project1(pool3)
-        x = x + pool3
+        x = 0.5*x + 0.5*pool3
 
         # 1/8 * 8 
-        x = self.upsample8(x)
+        x = F.interpolate(x, scale_factor=8, mode='bilinear', align_corners=False)
         return x 
 
     def _initialize_weights(self):
