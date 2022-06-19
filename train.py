@@ -67,7 +67,7 @@ def validate(model,criterion,dataloader,metrics,device,kargs):
             targets = targets.cpu().numpy()
 
             metrics.update(targets, preds, loss)
-            
+            break
             if kargs['save_results']:
                 for i in range(1):
                     image = images[i].detach().cpu().numpy()
@@ -194,12 +194,11 @@ def main():
                     # writer_val.add_scalar('Mean Acc',val_score['Mean Acc'],cur_iter)
                     writer_val.add_scalar('loss',val_score['Mean Loss'],cur_iter)
                     writer_val.add_scalar('mIOU',val_score['Mean IoU'],cur_iter)
-                    if cur_iter % 1 == 0:
-                        images = images.detach().cpu()
-                        fig = make_figure(images.detach().cpu(),targets.cpu(),outputs.detach().cpu(),kargs['cmap'])
-                        iou_bar = make_iou_bar(np.nan_to_num(val_score['Class IoU'].values()))
-                        writer_val.add_figure('Images',fig,cur_iter)
-                        writer_val.add_figure('IOU',iou_bar,cur_iter)
+                    images = images.detach().cpu()
+                    fig = make_figure(images.detach().cpu(),targets.cpu(),outputs.detach().cpu(),kargs['cmap'])
+                    iou_bar = make_iou_bar(np.nan_to_num(val_score['Class IoU'].values()))
+                    writer_val.add_figure('Images',fig,cur_iter)
+                    writer_val.add_figure('Class IOU',iou_bar,cur_iter)
                     model.train()
             lr_scheduler.step()
         total_time = time.time() - start_time + time_offset
