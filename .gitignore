@@ -2,5 +2,6 @@ dataset
 checkpoint
 logs
 __pycache__
+results
 practice.ipynb
 test.ipynb

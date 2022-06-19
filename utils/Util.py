@@ -63,19 +63,37 @@ class Denormalize(object):
 def mask_colorize(masks,cmap):
     # masks : BxCxHxW
     # if C != 1, argmax
-    if masks.size(1) == len(cmap):
-        _, masks = masks.max(dim=1)
-        masks = masks.unsqueeze(dim=1)
-    cmap_ = torch.tensor(cmap)
-    r_mask = torch.zeros_like(masks,dtype=torch.uint8)
-    g_mask = torch.zeros_like(masks,dtype=torch.uint8)
-    b_mask = torch.zeros_like(masks,dtype=torch.uint8)
-    for k in range(len(cmap)):
-        indices = masks == k
-        r_mask[indices] = cmap_[k,0]
-        g_mask[indices] = cmap_[k,1]
-        b_mask[indices] = cmap_[k,2]
-    return torch.cat([r_mask,g_mask,b_mask],dim=1)
+    # B H W -> B C H W (Torch.Tensor)
+    # H W -> H W C(numpy.ndarray)
+    if torch.is_tensor(masks):
+        assert masks.ndim >= 3
+        if masks.ndim == 4 and masks.size(1) == len(cmap): # B C H W Tensor
+            masks = masks.max(dim=1)[1] # B C H W -> B H W
+        else:
+            print("If Input Tensor Shape (B,C,H,W), C must be num_classes")
+        cmap_ = torch.tensor(cmap)
+        r_mask = torch.zeros_like(masks,dtype=torch.uint8)
+        g_mask = torch.zeros_like(masks,dtype=torch.uint8)
+        b_mask = torch.zeros_like(masks,dtype=torch.uint8)
+        for k in range(len(cmap)):
+            indices = masks == k
+            r_mask[indices] = cmap_[k,0]
+            g_mask[indices] = cmap_[k,1]
+            b_mask[indices] = cmap_[k,2]
+        return torch.cat([r_mask,g_mask,b_mask],dim=1)
+    elif isinstance(masks,np.ndarray): # H W
+        assert masks.ndim == 2
+        cmap_ = np.array(cmap)
+        r_mask = np.zeros_like(masks,dtype=np.uint8)
+        g_mask = np.zeros_like(masks,dtype=np.uint8)
+        b_mask = np.zeros_like(masks,dtype=np.uint8)
+        for k in range(len(cmap)):
+            indices = masks == k
+            r_mask[indices] = cmap_[k,0]
+            g_mask[indices] = cmap_[k,1]
+            b_mask[indices] = cmap_[k,2]
+        return np.stack([r_mask,g_mask,b_mask],axis=2)
+
 
 def make_figure(images,targets,outputs,colormap):
     if targets.dim() == 3: # BxHxW

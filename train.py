@@ -3,14 +3,16 @@ from tqdm import tqdm
 import os
 import argparse
 import numpy as np
+import matplotlib as mpl
 import matplotlib.pyplot as plt
+from PIL import Image
 
 import torch
 import torchvision
 from torch.utils.data import DataLoader
 
 import models
-from utils import get_dataset,make_figure,make_iou_bar,save,load,SegMetrics,Denormalize
+from utils import get_dataset,mask_colorize,make_figure,make_iou_bar,save,load,SegMetrics,Denormalize
 
 def get_args():
 
@@ -19,6 +21,7 @@ def get_args():
     parser.add_argument("--data_root", type=str, default='./dataset',help="path to Dataset")
     parser.add_argument("--dataset", choices=['voc2012','cityscapes'], type=str, help="dataset name",required=True)
     parser.add_argument("--num_classes", type=int, default=None, help="num classes (default: None)")
+    parser.add_argument("--cmap", default=None, help="mask colormap (default: None)")
     parser.add_argument("-j", "--num_workers", default=0, type=int, help="number of data loading workers (default: 0)")
     parser.add_argument("--batch_size", default=8, type=int, help="images per gpu")
     parser.add_argument("--val_batch_size", default=8, type=int, help="validation images per gpu")
@@ -72,8 +75,8 @@ def validate(model,criterion,dataloader,metrics,device,kargs):
                     pred = preds[i]
 
                     image = (denorm(image) * 255).transpose(1, 2, 0).astype(np.uint8)
-                    target = loader.dataset.decode_target(target).astype(np.uint8)
-                    pred = loader.dataset.decode_target(pred).astype(np.uint8)
+                    target = mask_colorize(target,kargs['cmap']).astype(np.uint8)
+                    pred = mask_colorize(pred,kargs['cmap']).astype(np.uint8)
 
                     Image.fromarray(image).save('results/%d_image.png' % img_id)
                     Image.fromarray(target).save('results/%d_target.png' % img_id)
@@ -84,8 +87,8 @@ def validate(model,criterion,dataloader,metrics,device,kargs):
                     plt.axis('off')
                     plt.imshow(pred, alpha=0.7)
                     ax = plt.gca()
-                    ax.xaxis.set_major_locator(matplotlib.ticker.NullLocator())
-                    ax.yaxis.set_major_locator(matplotlib.ticker.NullLocator())
+                    ax.xaxis.set_major_locator(mpl.ticker.NullLocator())
+                    ax.yaxis.set_major_locator(mpl.ticker.NullLocator())
                     plt.savefig('results/%d_overlay.png' % img_id, bbox_inches='tight', pad_inches=0)
                     plt.close()
                     img_id += 1
@@ -100,7 +103,7 @@ def main():
 
     kargs = vars(get_args())
     if kargs['dataset'].lower() == 'voc2012':
-        kargs['num_classes'] = 21   
+        kargs['num_classes'] = 21
     elif kargs['dataset'].lower() == 'cityscapes':
         kargs['num_classes'] = 19
     
@@ -119,11 +122,8 @@ def main():
     # DataLoader
     train_ds, val_ds= get_dataset(data_dir,kargs)
     dataloaders = {'train':DataLoader(train_ds,batch_size=kargs['batch_size'],num_workers=kargs['num_workers'],shuffle=True),
-                    'val':DataLoader(val_ds,batch_size=kargs['batch_size'],num_workers=kargs['num_workers'],shuffle=False)}
-    # Parameters
-    total_iters = kargs['total_iters']
-    colormap = train_ds.getcmap()
-
+                    'val':DataLoader(val_ds,batch_size=kargs['val_batch_size'],num_workers=kargs['num_workers'],shuffle=False)}
+    kargs['cmap'] = train_ds.getcmap()
     # Model
     model = models.model.__dict__[kargs['model']](num_classes=kargs['num_classes'],output_stride=kargs['output_stride']).to(device)
     # Loss
@@ -162,6 +162,8 @@ def main():
             model.train()
             epoch += 1
             interval_loss = 0.0
+            if cur_iter > kargs['total_iters']:
+                break
             for data in dataloaders['train']:
                 cur_iter += 1
                 images = data['image'].to(device,dtype=torch.float32)
@@ -194,14 +196,12 @@ def main():
                     writer_val.add_scalar('mIOU',val_score['Mean IoU'],cur_iter)
                     if cur_iter % 1 == 0:
                         images = images.detach().cpu()
-                        fig = make_figure(images.detach().cpu(),targets.cpu(),outputs.detach().cpu(),colormap)
+                        fig = make_figure(images.detach().cpu(),targets.cpu(),outputs.detach().cpu(),kargs['cmap'])
                         iou_bar = make_iou_bar(np.nan_to_num(val_score['Class IoU'].values()))
                         writer_val.add_figure('Images',fig,cur_iter)
                         writer_val.add_figure('IOU',iou_bar,cur_iter)
                     model.train()
             lr_scheduler.step()
-            if cur_iter > kargs['total_iters']:
-                break
         total_time = time.time() - start_time + time_offset
         writer_train.add_text("total time",str(datetime.timedelta(seconds=total_time)))
         writer_train.close()
