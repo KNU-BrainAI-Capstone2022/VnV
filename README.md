@@ -1,4 +1,6 @@
 # View and Vision
+Goal : Real-Time Semantic Segmentation on Edge Devices or Mobile Devices
+
 
 ## Setup Dataset
 ```bash
@@ -54,5 +56,28 @@ optional arguments:
                         print interval of loss (default: 10)
   --val_interval VAL_INTERVAL
                         iteration interval for eval (default: 100)
+```
+Simple Train Example
+```
+python train.py --dataset cityscapes --model deeplabv3_resnet50
+```
+Simple Evaluate Example
+```
+# Given the --save_results option, the Segmentation results images are stored in the ./results folder.
+python train.py --dataset cityscapes --model deeplabv3_resnet50 --test_only --save_results
+```
+### Encoding MP4
+available pretrained model : https://drive.google.com/drive/folders/1xG5QCrPuSSFUFPGfVhr7qE5OkVlJii3u?usp=sharing
+```
+python encoding.py -h
+usage: encoding.py [-h] --model MODEL --input INPUT [--pair] [--test]
 
+PyTorch Segmentation Video Encoding
+
+optional arguments:
+  -h, --help     show this help message and exit
+  --model MODEL  model name
+  --input INPUT  input video name
+  --pair         Generate pair frame
+  --test         Generate thunbnail
 ```
