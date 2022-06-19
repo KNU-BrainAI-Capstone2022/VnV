@@ -62,15 +62,15 @@ optional arguments:
                         iteration interval for eval (default: 100)
 ```
 
-Train Example
+* Train Example
 ```bash
 python train.py --dataset cityscapes --model deeplabv3_resnet50
 ```
-Continue Train Example
+* Continue Train Example
 ```bash
 python train.py --dataset cityscapes --model deeplabv3_resnet50 --resume
 ```
-Evaluate Example
+* Evaluate Example
 ```bash
 # Given the --save_results option, the Segmentation results images are stored in the ./results folder.
 python train.py --dataset cityscapes --model deeplabv3_resnet50 --test_only --save_results
