@@ -6,8 +6,12 @@ Goal : Real-Time Semantic Segmentation on Edge Devices or Mobile Devices
 ```bash
 bash setup_dataset.sh [data_dir] [dataset : {voc2012,cityscapes}]
 ```
+The selected dataset is installed under data_dir. When you install cityscapes, you must have an account at https://www.cityscapes-dataset.com/.  
+Required Space  
+Pascal VOC 2012 : 2GB  
+Cityscapes : 11.6 GB  
 ## Train model
-```
+```bash
 python train.py -h
 usage: train.py [-h] --data_root DATA_ROOT --dataset {voc2012,cityscapes}
                 [--num_classes NUM_CLASSES] --model
@@ -57,18 +61,24 @@ optional arguments:
   --val_interval VAL_INTERVAL
                         iteration interval for eval (default: 100)
 ```
-Simple Train Example
-```
+
+Train Example
+```bash
 python train.py --dataset cityscapes --model deeplabv3_resnet50
 ```
-Simple Evaluate Example
+Continue Train Example
+```bash
+python train.py --dataset cityscapes --model deeplabv3_resnet50 --resume
 ```
+Evaluate Example
+```bash
 # Given the --save_results option, the Segmentation results images are stored in the ./results folder.
 python train.py --dataset cityscapes --model deeplabv3_resnet50 --test_only --save_results
 ```
 ### Encoding MP4
+When the train is completed above, insert the mp4 file to be segmented in the ./video folder and execute the code. or you can use a pretrained model.
 available pretrained model : https://drive.google.com/drive/folders/1xG5QCrPuSSFUFPGfVhr7qE5OkVlJii3u?usp=sharing
-```
+```bash
 python encoding.py -h
 usage: encoding.py [-h] --model MODEL --input INPUT [--pair] [--test]
 
