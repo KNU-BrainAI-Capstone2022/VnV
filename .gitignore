@@ -5,3 +5,5 @@ __pycache__
 results
 practice.ipynb
 test.ipynb
+*.mp4
+*.jpg
