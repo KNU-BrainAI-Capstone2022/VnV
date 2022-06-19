@@ -39,11 +39,12 @@ model.load_state_dict(dict_model['model_state'])
 
 # video write
 input_video = 'video/'+kargs['input']+'.mp4'
+if not os.path.exists('./video'):
+    os.mkdir('./video')
 if not os.path.exists(input_video):
     print('input video is not exist\n')
     exit(1)
 cap = cv2.VideoCapture(input_video)
-
 
 frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
 frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -88,6 +89,7 @@ with torch.no_grad():
             result = cv2.vconcat([frame,result])
         if kargs['test']:
             cv2.imwrite('video/test.jpg',result)
+            print('Generate test.jpg')
             exit(1)
         else:
             out_cap.write(result)
