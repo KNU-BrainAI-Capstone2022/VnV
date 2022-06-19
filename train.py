@@ -52,8 +52,12 @@ def get_args():
 def validate(model,criterion,dataloader,metrics,device,kargs):
     metrics.reset()
     if kargs['save_results']:
-        if not os.path.exists('results',f"{kargs['model']}_{kargs['dataset']}"):
-            os.mkdir('results',f"{kargs['model']}_{kargs['dataset']}")
+        result_pth = os.path.join(os.getcwd(),'results')
+        if not os.path.exists(result_pth):
+            os.mkdir(result_pth)
+        result_pth= os.path.join(result_pth,f"{kargs['model']}_{kargs['dataset']}")
+        if not os.path.exists(result_pth):
+            os.mkdir(result_pth)
     denorm = Denormalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     img_id = 0
     with torch.no_grad():
@@ -67,7 +71,7 @@ def validate(model,criterion,dataloader,metrics,device,kargs):
             targets = targets.cpu().numpy()
 
             metrics.update(targets, preds, loss)
-            break
+            
             if kargs['save_results']:
                 for i in range(1):
                     image = images[i].detach().cpu().numpy()
@@ -78,9 +82,9 @@ def validate(model,criterion,dataloader,metrics,device,kargs):
                     target = mask_colorize(target,kargs['cmap']).astype(np.uint8)
                     pred = mask_colorize(pred,kargs['cmap']).astype(np.uint8)
 
-                    Image.fromarray(image).save('results/%d_image.png' % img_id)
-                    Image.fromarray(target).save('results/%d_target.png' % img_id)
-                    Image.fromarray(pred).save('results/%d_pred.png' % img_id)
+                    Image.fromarray(image).save(os.path.join(result_pth,'%d_image.png' % img_id))
+                    Image.fromarray(target).save(os.path.join(result_pth,'%d_target.png' % img_id))
+                    Image.fromarray(pred).save(os.path.join(result_pth,'%d_pred.png' % img_id))
 
                     fig = plt.figure()
                     plt.imshow(image)
@@ -89,7 +93,7 @@ def validate(model,criterion,dataloader,metrics,device,kargs):
                     ax = plt.gca()
                     ax.xaxis.set_major_locator(mpl.ticker.NullLocator())
                     ax.yaxis.set_major_locator(mpl.ticker.NullLocator())
-                    plt.savefig('results/%d_overlay.png' % img_id, bbox_inches='tight', pad_inches=0)
+                    plt.savefig(os.path.join(result_pth,'%d_overlay.png' % img_id), bbox_inches='tight', pad_inches=0)
                     plt.close()
                     img_id += 1
 

@@ -10,13 +10,13 @@ import argparse
 
 def get_args():
 
-    parser = argparse.ArgumentParser(description="PyTorch Segmentation Training")
+    parser = argparse.ArgumentParser(description="PyTorch Segmentation Video Encoding")
     # model option
     parser.add_argument("--model", type=str, help="model name",required=True)
     # Dataset Options
     parser.add_argument("--input", type=str, help="input video name",required=True)
-    parser.add_argument("--pair", action='store_true', help="Generate pair image")
-    parser.add_argument("--test", action='store_true', help="Generate test.jpg")
+    parser.add_argument("--pair", action='store_true', help="Generate pair frame")
+    parser.add_argument("--test", action='store_true', help="Generate thunbnail")
 
     return parser.parse_args()
     
