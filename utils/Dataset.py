@@ -81,7 +81,7 @@ class CustomVOCSegmentation(torch.utils.data.Dataset):
     
     def getclasses(self):
         return self._classes
-
+        
     def getcmap(self):
         return self._cmap
 
