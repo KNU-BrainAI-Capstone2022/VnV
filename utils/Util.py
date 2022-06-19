@@ -67,10 +67,9 @@ def mask_colorize(masks,cmap):
     # H W -> H W C(numpy.ndarray)
     if torch.is_tensor(masks):
         assert masks.ndim >= 3
-        if masks.ndim == 4 and masks.size(1) == len(cmap): # B C H W Tensor
+        if masks.ndim == 4: # B C H W Tensor
             masks = masks.max(dim=1)[1] # B C H W -> B H W
-        else:
-            print("If Input Tensor Shape (B,C,H,W), C must be num_classes")
+        masks = masks.unsqueeze(1)
         cmap_ = torch.tensor(cmap)
         r_mask = torch.zeros_like(masks,dtype=torch.uint8)
         g_mask = torch.zeros_like(masks,dtype=torch.uint8)
@@ -96,18 +95,20 @@ def mask_colorize(masks,cmap):
 
 
 def make_figure(images,targets,outputs,colormap):
-    if targets.dim() == 3: # BxHxW
-        targets = targets.unsqueeze(1)
     n=images.size(0)
     fig, ax = plt.subplots(3,1,figsize=(n*3,9))
     ax[0].imshow(torchvision.utils.make_grid(images.cpu(), normalize=True).permute(1,2,0))
     ax[0].set_title("Input")
     ax[0].axis('off')
+    print(targets.shape)
     targets = mask_colorize(targets,colormap)
+    print(targets.shape)
     ax[1].imshow(torchvision.utils.make_grid(targets.cpu(), normalize=False).permute(1,2,0))
     ax[1].set_title("Ground Truth")
     ax[1].axis('off')
+    print(outputs.shape)
     outputs = mask_colorize(outputs,colormap)
+    print(outputs.shape)
     ax[2].imshow(torchvision.utils.make_grid(outputs.cpu(), normalize=False).permute(1,2,0))
     ax[2].set_title("Prediction")
     ax[2].axis('off')
