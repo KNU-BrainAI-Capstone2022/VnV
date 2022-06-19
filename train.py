@@ -44,7 +44,7 @@ def get_args():
     parser.add_argument("--step_size", type=int, default=10000,help="(default: 10k)")
     parser.add_argument("--weight_decay",default=1e-4,type=float,help="weight_decay")
     parser.add_argument("--resume", action='store_true', default=False)
-    parser.add_argument("--print_interval", type=int, default=10,help="print interval of loss (default: 10)")
+    parser.add_argument("--print_interval", type=int, default=100,help="print interval of loss (default: 10)")
     parser.add_argument("--val_interval", type=int, default=1000,help="iteration interval for eval (default: 100)")
 
     return parser.parse_args()
@@ -52,8 +52,8 @@ def get_args():
 def validate(model,criterion,dataloader,metrics,device,kargs):
     metrics.reset()
     if kargs['save_results']:
-        if not os.path.exists('results'):
-            os.mkdir('results')
+        if not os.path.exists('results',f"{kargs['model']}_{kargs['dataset']}"):
+            os.mkdir('results',f"{kargs['model']}_{kargs['dataset']}")
     denorm = Denormalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     img_id = 0
     with torch.no_grad():
@@ -69,7 +69,7 @@ def validate(model,criterion,dataloader,metrics,device,kargs):
             metrics.update(targets, preds, loss)
             
             if kargs['save_results']:
-                for i in range(len(images)):
+                for i in range(1):
                     image = images[i].detach().cpu().numpy()
                     target = targets[i]
                     pred = preds[i]
