@@ -119,7 +119,7 @@ def main():
     # DataLoader
     train_ds, val_ds= get_dataset(data_dir,kargs)
     dataloaders = {'train':DataLoader(train_ds,batch_size=kargs['batch_size'],num_workers=kargs['num_workers'],shuffle=True),
-                    'val':DataLoader(val_ds,batch_size=kargs['batch_size'],num_workers=kargs['num_workers'],shuffle=False)}
+                    'val':DataLoader(val_ds,batch_size=kargs['val_batch_size'],num_workers=kargs['num_workers'],shuffle=False)}
     # Parameters
     total_iters = kargs['total_iters']
     colormap = train_ds.getcmap()

@@ -91,7 +91,6 @@ def deeplabv3plus_resnet50(num_classes=21, output_stride=8, pretrained_backbone=
     """
     return _load_model('deeplabv3plus', 'resnet50', num_classes, output_stride=output_stride, pretrained_backbone=pretrained_backbone)
 
-
 def deeplabv3plus_resnet101(num_classes=21, output_stride=8, pretrained_backbone=True):
     """Constructs a DeepLabV3+ model with a ResNet-101 backbone.
     Args:
