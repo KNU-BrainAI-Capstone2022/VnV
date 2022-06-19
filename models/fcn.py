@@ -26,7 +26,6 @@ class FCN(nn.Module):
         
         return result
     
-
 class FCNHead(nn.Sequential):
     def __init__(self,in_channels, num_class=21):
         inter_channels = in_channels //4
@@ -77,7 +76,7 @@ class FCN8(nn.Module):
 
         self.relu    = nn.ReLU(inplace=True)
         self.dropout = nn.Dropout2d(0.5)
-        self._initialize_weights()
+        self._init_weight()
 
     def forward(self, features):
     
@@ -101,9 +100,10 @@ class FCN8(nn.Module):
         x = F.interpolate(x, scale_factor=8, mode='bilinear', align_corners=False)
         return x 
 
-    def _initialize_weights(self):
-            for m in self.modules():
-                if isinstance(m, nn.Conv2d):
-                    m.weight.data.zero_()
-                    if m.bias is not None:
-                        m.bias.data.zero_()
+    def _init_weight(self):
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal_(m.weight)
+            elif isinstance(m, (nn.BatchNorm2d, nn.GroupNorm)):
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
