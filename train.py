@@ -205,8 +205,8 @@ def main():
                     writer_val.add_figure('Class IOU',iou_bar,cur_iter)
                     model.train()
             lr_scheduler.step()
-        total_time = time.time() - start_time + time_offset
-        writer_train.add_text("total time",str(datetime.timedelta(seconds=total_time)))
+        # total_time = time.time() - start_time + time_offset
+        # writer_train.add_text("total time",str(datetime.timedelta(seconds=total_time)))
         writer_train.close()
         writer_val.close()
 
