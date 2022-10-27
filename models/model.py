@@ -50,7 +50,7 @@ def _fcn_resnet(name, backbone_name, num_classes,pretrained_backbone):
 
     return model
 
-def _load_model(arch_type, backbone, num_classes, output_stride, pretrained_backbone):
+def _load_model(arch_type, backbone, num_classes, output_stride=8, pretrained_backbone=True):
     if arch_type =='fcn':
         if backbone.startswith('resnet'):
             model = _fcn_resnet(arch_type, backbone,num_classes,pretrained_backbone)
