@@ -1,27 +1,34 @@
 import torch
-import numpy as numpy
+import numpy as np
 import io
 import os
-
 from torch import nn
+import cv2
+import argparse
+
+from utils import Dataset,Util
+import models
 
 import torch.onnx
-import models
-import argparse
-import cv2
+
+import pycuda.driver 
+import pycuda.autoinit
+from torch2trt import torch2trt, TRTModule
 
 if __name__=='__main__':
 
     parser = argparse.ArgumentParser(description="PyTorch Segmentation Training")
-    parser.add_argument("--num_classes", type=int, default=19, help="num classes (default: None)")
+    parser.add_argument("--num_classes", type=int, default=19, help="num classes (default: 19, cityscapes)")
     available_models = sorted(name for name in models.model.__dict__ if name.islower() and \
                               not (name.startswith("__") or name.startswith('_')) and callable(
                               models.model.__dict__[name])
                               )
     parser.add_argument("--model", choices=available_models, default="deeplabv3plus_resnet50", type=str, help="model name")
     parser.add_argument("--output_stride", type=int, default=16, choices=[8, 16]) # DeepLab Only
-    parser.add_argument("--weights", type=str,default='./checkpoint/deeplabv3plus_resnet50_cityscapes/model_best.pth', help='weight file')
+    parser.add_argument("--weights", type=str,default='./checkpoint/deeplabv3plus_resnet50_cityscapes/model_best.pth', help='weight file path')
     parser.add_argument("--video", type=str, help="input video name in video floder",required=True)
+    parser.add_argument("--fp16", action='store_true', help='Create tensorrt fp16')
+    parser.add_argument("--int8", action='store_true', help='Create tensorrt int8')
     kargs = vars(parser.parse_args())
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -39,7 +46,8 @@ if __name__=='__main__':
         print('input video is not exist\n')
         exit(1)
     print(f'input_video = {input_video}')
-    print(cv2.getBuildInformation())
+    # print cap info
+    # print(cv2.getBuildInformation())
     cap = cv2.VideoCapture(input_video)
     if cap.isOpened():
         frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -48,4 +56,47 @@ if __name__=='__main__':
         print(f'video ({frame_width},{frame_height}), {fps} fps')
     else:
         print(f'video is not opened')
+    model.eval()
+    input_size = torch.randn(1,3,frame_height,frame_width).to(device)
+    torch_out = model(input_size)
+    #print(model)
+    # torch --> onnx
 
+    save_name = f"{kargs['weights'][:-4]}.onnx"
+    print(f'\nCreating onnx file...')
+    torch.onnx.export(
+        model,                      # 모델
+        input_size,                 # 모델 입력값
+        save_name,                  # 모델 저장 경로
+        verbose=False,              # 변환 과정
+        export_params=True,         # 모델 파일 안에 학습된 모델 가중치 저장
+        opset_version = 11,         # onnx 버전
+        input_names=['input'],      # 모델의 입력값을 가리키는 이름
+        output_names= ['output'],   # 모델의 아웃풋 이름
+        operator_export_type=torch.onnx.OperatorExportTypes.ONNX,
+    )
+    print(f"{kargs['model']}.pth -> onnx is done")
+
+    # onnx - > tensorrt
+    # /usr/src/tensorrt/bin/trtexec --onnx= model.onnx --saveEngine=model.trt
+
+    # pytorch -> tensorrt
+    print(f'\nCreating trt file...')
+    if kargs['fp16']:
+        trt_model = torch2trt(model,[input_size], max_workspace_size=1<<32,fp16_mode=True)
+        torch.save(trt_model.state_dict(),f"{kargs['weights'][:-4]}_trt_fp16.pth")
+        print(f"TRTModule {kargs['weights'][:-4]}_trt_fp16.pth is Created")
+    if kargs['int8']:
+        trt_model = torch2trt(model,[input_size], max_workspace_size=1<<32,int8_mode=True)
+        torch.save(trt_model.state_dict(),f"{kargs['weights'][:-4]}_trt_int8.pth")
+        print(f"TRTModule {kargs['weights'][:-4]}_trt_int8.pth is Created")
+
+    # Torchscript module 저장
+    print(f'\nCreating jit file...')
+    try:
+        script_model = torch.jit.script(model)
+        script_model.save(f"{kargs['weights'][:-4]}.ts")
+        print(f"Jit script {kargs['weights'][:-4]}.ts is Created")
+    except Exception as e:
+        print(e)
+        print('unable to convert jit script')
