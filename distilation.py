@@ -68,6 +68,7 @@ def get_args():
     return parser.parse_args()
 
 def validate(model,criterion,dataloader,metrics,device,kargs):
+    
     metrics.reset()
     if kargs['save_results']:
         result_pth = os.path.join(os.getcwd(),'results_distilation')
@@ -83,7 +84,7 @@ def validate(model,criterion,dataloader,metrics,device,kargs):
             images = data['image'].to(device, dtype=torch.float32)
             targets = data['target'].squeeze(1).to(device, dtype=torch.long)
             outputs = model(images)
-
+            
             loss = criterion(outputs,targets).detach().cpu().numpy()
             preds = outputs.detach().max(dim=1)[1].cpu().numpy()
             targets = targets.cpu().numpy()
@@ -164,11 +165,13 @@ def main():
     student, teacher, optimizer, lr_scheduler, cur_iter, best_score, = load_for_distilation(ckpt_dir,teacher_ckpt_dir,student,teacher,optimizer,lr_scheduler,kargs)
     # Metric
     metrics = SegMetrics(kargs['num_classes'])
+    # Loss (Validate)
+    criterion = nn.CrossEntropyLoss(ignore_index=255)
     # Test-only
     if kargs['test_only']:
         start=time.time()
         student.eval()
-        val_score = validate(student,dataloaders['val'],metrics,device,kargs)
+        val_score = validate(student,criterion,dataloaders['val'],metrics,device,kargs)
         end = time.time()
         print(metrics.to_str(val_score))
         print(f"Average Inference Time : {(end-start)/len(val_ds)}")
@@ -211,7 +214,7 @@ def main():
                 if cur_iter % kargs['val_interval'] == 0:
                     student.eval()
                     print("Validation")
-                    val_score = validate(student,dataloaders['val'],metrics,device,kargs)
+                    val_score = validate(student,criterion,dataloaders['val'],metrics,device,kargs)
                     print(metrics.to_str(val_score))
                     save(ckpt_dir,student,optimizer,lr_scheduler,cur_iter,best_score,f"model_last_{cur_iter}.pth")
                     if val_score['Mean IoU'] > best_score:  # save best model
@@ -220,7 +223,7 @@ def main():
                     # writer_val.add_scalar('Mean Acc',val_score['Mean Acc'],cur_iter)
                     writer_val.add_scalar('loss',val_score['Mean Loss'],cur_iter)
                     writer_val.add_scalar('mIOU',val_score['Mean IoU'],cur_iter)
-                    fig = make_figure(images[0].detach().cpu(),targets[0].cpu(),outputs[0].detach().cpu(),kargs['cmap'])
+                    fig = make_figure(images.detach().cpu(),targets.cpu(),outputs.detach().cpu(),kargs['cmap'])
                     iou_bar = make_iou_bar(np.nan_to_num(val_score['Class IoU'].values()))
                     writer_val.add_figure('Images',fig,cur_iter)
                     writer_val.add_figure('Class IOU',iou_bar,cur_iter)
