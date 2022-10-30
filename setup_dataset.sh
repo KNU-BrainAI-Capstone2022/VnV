@@ -35,6 +35,7 @@ elif [ $2 == 'cityscapes' ]; then
     fi
     rm leftImg8bit_trainvaltest.zip
     # Download Ground Truth
+    wget --keep-session-cookies --save-cookies=cookies.txt --post-data "username=$name&password=$passwd&submit=Login" https://www.cityscapes-dataset.com/login/
     wget --load-cookies cookies.txt --content-disposition https://www.cityscapes-dataset.com/file-handling/?packageID=1
     unzip gtFine_trainvaltest.zip
     if [ -e 'index.html' ]; then

@@ -23,7 +23,10 @@ def save(ckpt_dir,model,optim,lr_scheduler,cur_iter,best_score,filename):
 # 모델 로드 함수
 def load(ckpt_dir,model,optim,lr_scheduler,kargs):
     if kargs['resume'] == True:
-        ckpt = os.path.join(ckpt_dir,"model_last.pth")
+        for f in os.listdir(ckpt_dir):
+            if f.find("last") != -1:
+                ckpt = os.path.join(ckpt_dir,f)
+                break
     elif kargs['test_only'] == True:
         ckpt = os.path.join(ckpt_dir,"model_best.pth")
     else:
@@ -45,6 +48,30 @@ def load(ckpt_dir,model,optim,lr_scheduler,kargs):
     best_score = dict_model['best_score']
     print("Model restored from %s" % ckpt)
     return model,optim,lr_scheduler,cur_iter,best_score
+
+# Knowledge Distilation 학습 시 모델 로드 함수
+def load_for_distilation(ckpt_dir,teacher_ckpt_dir,student,teacher,optim,lr_scheduler,kargs):
+    t_ckpt = os.path.join(teacher_ckpt_dir,"model_best.pth")
+    teacher.load_state_dict(torch.load(t_ckpt)['model_state'])
+    
+    if kargs['resume']:
+        for f in os.listdir(ckpt_dir):
+            if f.find("last") != -1:
+                s_ckpt = os.path.join(ckpt_dir,f)
+                break
+    else:
+        cur_iter = 0
+        best_score = 0
+        return student,teacher,optim,lr_scheduler,cur_iter,best_score
+
+    dict_model = torch.load(s_ckpt)
+    student.load_state_dict(dict_model['model_state'])
+    optim.load_state_dict(dict_model['optim_state'])
+    lr_scheduler.load_state_dict(dict_model['lr_scheduler_state'])
+    cur_iter = dict_model['cur_iter']
+    best_score = dict_model['best_score']
+    print("Model restored from %s" % s_ckpt)
+    return student,teacher,optim,lr_scheduler,cur_iter,best_score
 # -------------------------- Model -----------------------------------
 
 # -------------------------- Metric / Result -----------------------------------
