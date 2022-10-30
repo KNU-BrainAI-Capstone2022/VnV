@@ -57,7 +57,7 @@ def get_args():
     # model option
     parser.add_argument("--weights", type=str, default=None,help="model weights path")
     # Dataset Options
-    parser.add_argument("--input", type=str, help="input video name",required=True)
+    parser.add_argument("--video", type=str, help="input video name",required=True)
     parser.add_argument("--pair", action='store_true', help="Generate pair frame")
     parser.add_argument("--test", action='store_true', help="Generate thunbnail")
     parser.add_argument("--fp16", action='store_true', help="data type fp16")
@@ -75,13 +75,13 @@ if __name__=='__main__':
         exit(1)
 
     # load pytorch model
-    onnx_file_path = "checkpoint/deeplabv3plus_resnet50_cityscapes/model_best.onnx"
+    onnx_file_path = kargs['weights']
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
     print(f'device {device}')
 
     # video write
-    input_video = 'video/'+kargs['input']+'.mp4'
+    input_video = 'video/'+kargs['video']+'.mp4'
     if not os.path.exists('./video'):
         os.mkdir('./video')
     if not os.path.exists(input_video):
@@ -96,10 +96,10 @@ if __name__=='__main__':
 
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     if kargs['pair']:
-        out_name = 'video/'+kargs['input']+'_output_pair.mp4'
+        out_name = 'video/'+kargs['video']+'_output_pair.mp4'
         out_cap = cv2.VideoWriter(out_name,fourcc,fps,(frame_width,2*frame_height))
     else:
-        out_name = 'video/'+kargs['input']+'_output.mp4'
+        out_name = 'video/'+kargs['video']+'_output.mp4'
         out_cap = cv2.VideoWriter(out_name,fourcc,fps,(frame_width,frame_height))
     print(f'{input_video} encoding ...')
 
@@ -112,28 +112,52 @@ if __name__=='__main__':
     # # Create context
     # context = engine.create_execution_context()
     print(f'\nonnx weights loading ...')
+
     onnx_model = onnx.load(onnx_file_path)
     onnx.checker.check_model(onnx_model)
-    session = onnxruntime.InferenceSession(onnx_file_path, providers=['CUDAExecutionProvider', 'CPUExecutionProvider']))
+    session = onnxruntime.InferenceSession(onnx_file_path, providers=['CUDAExecutionProvider', 'CPUExecutionProvider'])
     binding = session.io_binding()
 
     total_frame=0
     with torch.no_grad():
         start = time.time()
-        print("Start TensorRT Test...")
+        print("Start onnx Test...")
         while total_frame<10:
+            print(total_frame)
             ret, frame = cap.read()
             if not ret:
                 print('cap.read is failed')
                 break
             frame = cv2.cvtColor(frame,cv2.COLOR_BGR2RGB)
-            predict = F.to_tensor(frame).unsqueeze(0).to(device, dtype=torch.float32)
-            predict = F.normalize(predict,(0.485,0.456,0.406),(0.229,0.224,0.225))
+            inputs = F.to_tensor(frame).unsqueeze(0).to(device, torch.float32)
+            inputs = F.normalize(inputs,(0.485,0.456,0.406),(0.229,0.224,0.225))
+            inputs = inputs.contiguous()
 
-            # compute ONNX Runtime output prediction
-            ort_inputs = {ort_session.get_inputs()[0].name: to_numpy(predict)}
-            ort_outs = ort_session.run(None, ort_inputs)
-            img_out_y = ort_outs[0]
+            binding.bind_input(
+                name='inputs',
+                device_type='cuda',
+                device_id=0,
+                element_type=np.float32,
+                shape=tuple(inputs.shape),
+                buffer_ptr=inputs.data_ptr(),
+                )
+            ## Allocate the PyTorch tensor for the model output
+            outputs = torch.empty((1,19,1080,1920), dtype=torch.float32, device=device).contiguous()
+            
+            binding.bind_output(
+                name='outputs',
+                device_type='cuda',
+                device_id=0,
+                element_type=np.float32,
+                shape=tuple(outputs.shape),
+                buffer_ptr=outputs.data_ptr(),
+            )
+
+            session.run_with_iobinding(binding)
+
+            # ort_output=OrtValue
+            ort_output = binding.get_outputs()[0]
+            img_out_y = ort_output.numpy()
 
             img_out_y = np.squeeze(img_out_y,axis=0)
             img_out_y = np.argmax(img_out_y,axis=0)
