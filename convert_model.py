@@ -29,11 +29,14 @@ if __name__=='__main__':
     parser.add_argument("--video", type=str, help="input video name in video floder",required=True)
     parser.add_argument("--fp16", action='store_true', help='Create tensorrt fp16')
     parser.add_argument("--int8", action='store_true', help='Create tensorrt int8')
+    parser.add_argument("--fp32", action='store_true', help='Create tensorrt fp32')
     parser.add_argument("--jit", action='store_true', help='Create pytorch jit')
+    parser.add_argument("--onnx", action='store_true', help='Create onnx fp32')
+    parser.add_argument("--trt", action='store_true', help='Create tensorrt model')
     kargs = vars(parser.parse_args())
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = models.model.__dict__[kargs['model']](num_classes=kargs['num_classes'],output_stride=16,pretrained_backbone=False)
+    model = models.model.__dict__[kargs['model']](num_classes=kargs['num_classes'],output_stride=16,pretrained_backbone=False).to(device)
     
     # load weight
     dict_model = torch.load(kargs['weights'])
@@ -57,41 +60,48 @@ if __name__=='__main__':
         print(f'video ({frame_width},{frame_height}), {fps} fps')
     else:
         print(f'video is not opened')
-    # model.eval()
-    input_size = torch.randn(1,3,frame_height,frame_width)
-    # torch_out = model(input_size)
+    model.eval()
+
+    input_size = torch.randn(1,3,frame_height,frame_width,requires_grad=True).to(device,torch.float32)
+    torch_out = model(input_size)
     #print(model)
     # torch --> onnx
-
-    save_name = f"{kargs['weights'][:-4]}.onnx"
-    print(f'\nCreating onnx file...')
-    torch.onnx.export(
-        model,                      # 모델
-        input_size,                 # 모델 입력값
-        save_name,                  # 모델 저장 경로
-        verbose=False,              # 변환 과정
-        export_params=True,         # 모델 파일 안에 학습된 모델 가중치 저장
-        opset_version = 11,         # onnx 버전
-        input_names=['inputs'],      # 모델의 입력값을 가리키는 이름
-        output_names= ['outputs'],   # 모델의 아웃풋 이름
-        operator_export_type=torch.onnx.OperatorExportTypes.ONNX,
-    )
-    print(f"{kargs['model']}.pth -> onnx is done")
+    if kargs['onnx']:
+        save_name = f"{kargs['weights'][:-4]}.onnx"
+        print(f'\nCreating onnx file...')
+        torch.onnx.export(
+            model,                      # 모델
+            input_size,                 # 모델 입력값
+            save_name,                  # 모델 저장 경로
+            verbose=True,              # 변환 과정
+            export_params=True,         # 모델 파일 안에 학습된 모델 가중치 저장
+            opset_version = 11,         # onnx 버전
+            input_names=['inputs'],      # 모델의 입력값을 가리키는 이름
+            output_names= ['outputs'],   # 모델의 아웃풋 이름
+            operator_export_type=torch.onnx.OperatorExportTypes.ONNX,
+        )
+        print(f"{kargs['model']}.pth -> onnx is done")
 
     # onnx - > tensorrt
     # /usr/src/tensorrt/bin/trtexec --onnx= model.onnx --saveEngine=model.trt
 
     # pytorch -> tensorrt
-    if kargs['fp16']:
-        print(f'\nCreating trt fp16 file...')
-        trt_model = torch2trt(model,[input_size], max_workspace_size=1<<32,fp16_mode=True)
-        torch.save(trt_model.state_dict(),f"{kargs['weights'][:-4]}_trt_fp16.pth")
-        print(f"TRTModule {kargs['weights'][:-4]}_trt_fp16.pth is Created")
-    if kargs['int8']:
-        print(f'\nCreating trt int8 file...')
-        trt_model = torch2trt(model,[input_size], max_workspace_size=1<<32,int8_mode=True)
-        torch.save(trt_model.state_dict(),f"{kargs['weights'][:-4]}_trt_int8.pth")
-        print(f"TRTModule {kargs['weights'][:-4]}_trt_int8.pth is Created")
+    if kargs['trt']:
+        if kargs['int8']:
+            print(f'\nCreating trt int8 file...')
+            trt_model = torch2trt(model,[input_size], max_workspace_size=1<<32,int8_mode=True,use_onnx=True)
+            torch.save(trt_model.state_dict(),f"{kargs['weights'][:-4]}_trt_int8.pth")
+            print(f"TRTModule {kargs['weights'][:-4]}_trt_int8.pth is Created")
+        if kargs['fp32']:
+            print(f'\nCreating trt float32 file...')
+            trt_model = torch2trt(model,[input_size], max_workspace_size=1<<32,use_onnx=True)
+            torch.save(trt_model.state_dict(),f"{kargs['weights'][:-4]}_trt_float32.pth")
+            print(f"TRTModule {kargs['weights'][:-4]}_trt_float32.pth is Created")
+        if kargs['fp16']:
+            print(f'\nCreating trt fp16 file...')
+            trt_model = torch2trt(model,[input_size], max_workspace_size=1<<32,fp16_mode=True,use_onnx=True)
+            torch.save(trt_model.state_dict(),f"{kargs['weights'][:-4]}_trt_fp16.pth")
+            print(f"TRTModule {kargs['weights'][:-4]}_trt_fp16.pth is Created")
 
     # Torchscript module 저장
     

@@ -1,6 +1,7 @@
 #!/bin/bash
 if [ $# -ne 2 ]; then
     echo "Use : bash setup_cityscapes.sh [data_dir] [dataset]"
+    exit
 fi
 
 if [ -z $1 ]; then

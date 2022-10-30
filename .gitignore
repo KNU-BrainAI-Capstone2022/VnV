@@ -1,6 +1,6 @@
 dataset
 checkpoint
-logs
+logs*
 __pycache__
 results
 practice.ipynb

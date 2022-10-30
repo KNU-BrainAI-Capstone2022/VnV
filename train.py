@@ -13,6 +13,7 @@ from torch.utils.data import DataLoader
 
 import models
 from utils import get_dataset,mask_colorize,make_figure,make_iou_bar,save,load,SegMetrics,Denormalize
+from torch2trt import TRTModule
 
 def get_args():
 
@@ -32,7 +33,7 @@ def get_args():
                               not (name.startswith("__") or name.startswith('_')) and callable(
                               models.model.__dict__[name])
                               )
-    parser.add_argument("--model", choices=available_models, default="deeplabv3plus_resnet50", type=str, help="model name",required=True)
+    parser.add_argument("--model", choices=available_models, default="deeplabv3plus_resnet50", type=str, help="model name")
     parser.add_argument("--output_stride", type=int, default=16, choices=[8, 16]) # DeepLab Only
 
     # Train Options
@@ -47,6 +48,9 @@ def get_args():
     parser.add_argument("--print_interval", type=int, default=100,help="print interval of loss (default: 10)")
     parser.add_argument("--val_interval", type=int, default=1000,help="iteration interval for eval (default: 100)")
 
+    # tensorrt Options
+    parser.add_argument("--trt", action="store_true", help="Can use tensorrt")
+    parser.add_argument("--tr_path", type=str, help="Tensorrt weight path")
     return parser.parse_args()
 
 def validate(model,criterion,dataloader,metrics,device,kargs):
@@ -129,21 +133,28 @@ def main():
                     'val':DataLoader(val_ds,batch_size=kargs['val_batch_size'],num_workers=kargs['num_workers'],shuffle=False)}
     kargs['cmap'] = train_ds.getcmap()
     # Model
-    model = models.model.__dict__[kargs['model']](num_classes=kargs['num_classes'],output_stride=kargs['output_stride']).to(device)
+    if kargs['trt']:
+        if not os.path.exists(kargs['tr_path']):
+            print('model is not exist\n')
+            exit(1)
+        model = TRTModule()
+        model.load_state_dict(torch.load(kargs['tr_path']))
+    else:
+        model = models.model.__dict__[kargs['model']](num_classes=kargs['num_classes'],output_stride=kargs['output_stride']).to(device)
+        # Optimizer
+        optimizer = torch.optim.SGD(params=[
+            {'params': model.backbone.parameters(), 'lr': 0.1 * kargs['lr']},
+            {'params': model.classifier.parameters(), 'lr': kargs['lr']},
+        ], lr=kargs['lr'], momentum=0.9, weight_decay=kargs['weight_decay'])
+        if kargs['lr_scheduler'] == 'exp':
+            lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.9)
+        elif kargs['lr_scheduler'] == 'step':
+            lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=kargs['step_size'], gamma=0.1)
+
+        # Load Checkpoint
+        model, optimizer, lr_scheduler, cur_iter, best_score, = load(ckpt_dir,model,optimizer,lr_scheduler,kargs)
     # Loss
     criterion = torch.nn.CrossEntropyLoss(ignore_index=255)
-    # Optimizer
-    optimizer = torch.optim.SGD(params=[
-        {'params': model.backbone.parameters(), 'lr': 0.1 * kargs['lr']},
-        {'params': model.classifier.parameters(), 'lr': kargs['lr']},
-    ], lr=kargs['lr'], momentum=0.9, weight_decay=kargs['weight_decay'])
-    if kargs['lr_scheduler'] == 'exp':
-        lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.9)
-    elif kargs['lr_scheduler'] == 'step':
-        lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=kargs['step_size'], gamma=0.1)
-
-    # Load Checkpoint
-    model, optimizer, lr_scheduler, cur_iter, best_score, = load(ckpt_dir,model,optimizer,lr_scheduler,kargs)
     # Metric
     metrics = SegMetrics(kargs['num_classes'])
     # Test-only

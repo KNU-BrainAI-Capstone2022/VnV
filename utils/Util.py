@@ -3,6 +3,7 @@ import torch
 import torchvision
 import numpy as np
 import matplotlib.pyplot as plt
+from typing import Optional
 
 from torchvision.transforms.functional import normalize
 # -------------------------- Model -----------------------------------
@@ -222,3 +223,36 @@ class SegMetrics(object):
     def reset(self):
         self.confusion_matrix = np.zeros((self.num_classes, self.num_classes))
         self.loss = []
+
+def label_to_one_hot_label(
+    labels: torch.Tensor,
+    num_classes: int,
+    device: Optional[torch.device] = None,
+    dtype: Optional[torch.dtype] = torch.long,
+    eps: float = 1e-6,
+    ignore_index = 255,
+) -> torch.Tensor:
+    r"""Convert an integer label x-D tensor to a one-hot (x+1)-D tensor.
+
+    Args:
+        labels: tensor with labels of shape :math:`(N, *)`, where N is batch size.
+          Each value is an integer representing correct classification.
+        num_classes: number of classes in labels.
+        device: the desired device of returned tensor.
+        dtype: the desired data type of returned tensor.
+    Returns:
+        the labels in one hot tensor of shape :math:`(N, C, *)`,
+    """
+    shape = labels.shape
+    # one hot : (B, C=ignore_index+1, H, W)
+    one_hot = torch.zeros((shape[0], ignore_index+1) + shape[1:], device=device, dtype=dtype)
+    
+    # labels : (B, H, W)
+    # labels.unsqueeze(1) : (B, C=1, H, W)
+    # one_hot : (B, C=ignore_index+1, H, W)
+    one_hot = one_hot.scatter_(1, labels.unsqueeze(1), 1.0) + eps
+    
+    # ret : (B, C=num_classes, H, W)
+    ret = torch.split(one_hot, [num_classes, ignore_index+1-num_classes], dim=1)[0]
+    
+    return ret

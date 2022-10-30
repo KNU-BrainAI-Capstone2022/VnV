@@ -1,4 +1,3 @@
-
 import os
 import argparse
 import numpy as np
@@ -11,14 +10,26 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torchvision
 from torch.utils.data import DataLoader
-from VnV.utils.Util import load_for_distilation
+from utils.Util import load_for_distilation,label_to_one_hot_label
 
 import models
 from utils import get_dataset,mask_colorize,make_figure,make_iou_bar,save,load,SegMetrics,Denormalize
 
-
-def loss_distillation(y, labels, teacher_scores, T=20.0, alpha=0.7):
-    return nn.KLDivLoss()(F.log_softmax(y/T), F.softmax(teacher_scores/T)) * (T*T * 2.0 + alpha) + F.cross_entropy(y,labels) * (1.-alpha)
+def loss_distillation(logits, labels, teacher_logits, T = 10, alpha = 0.1):
+    # # Method 1
+    # student_loss = F.cross_entropy(input=logits, target=labels, ignore_index=255)
+    # distillation_loss = nn.KLDivLoss(reduction='batchmean')(F.log_softmax(logits/T, dim=1), F.softmax(teacher_logits/T, dim=1)) * (T * T)
+    # total_loss =  alpha*student_loss + (1-alpha)*distillation_loss
+    # Method 2
+    total_loss = nn.KLDivLoss()(F.log_softmax(logits/T, dim=1),
+                             F.softmax(teacher_logits/T, dim=1)) * (alpha * T * T) + \
+              F.cross_entropy(logits, labels, ignore_index=255) * (1. - alpha)
+    # # Method 3
+    # student_loss = F.cross_entropy(input=logits, target=labels, ignore_index=255)
+    # distillation_loss = (F.softmax(teacher_logits/T, dim=1) * (F.log_softmax(teacher_logits/T, dim=1) - F.log_softmax(logits/T, dim=1))).mean()
+    # total_loss =  alpha*student_loss + (1-alpha)*distillation_loss
+    
+    return total_loss
 
 def get_args():
 
@@ -39,7 +50,7 @@ def get_args():
                               models.model.__dict__[name])
                               )
     parser.add_argument("--teacher", choices=available_models, default="deeplabv3plus_resnet50", type=str, help="model name",required=True)
-    parser.add_argument("--student", choices=available_models, default="deeplabv3plus_resnet18", type=str, help="model name",required=True)
+    parser.add_argument("--student", choices=available_models, default="deeplabv3plus_mobilenet", type=str, help="model name",required=True)
     parser.add_argument("--output_stride", type=int, default=16, choices=[8, 16]) # DeepLab Only
 
     # Train Options
@@ -128,8 +139,8 @@ def main():
     log_dir = os.path.join(log_dir,f"{kargs['student']}_{kargs['dataset']}")
     ckpt_dir = os.path.join(root_dir,"checkpoint")
     os.makedirs(ckpt_dir,exist_ok=True)
-    ckpt_dir = os.path.join(ckpt_dir,f"{kargs['student']}_{kargs['dataset']}")
     teacher_ckpt_dir = os.path.join(ckpt_dir,f"{kargs['teacher']}_{kargs['dataset']}")
+    ckpt_dir = os.path.join(ckpt_dir,f"{kargs['student']}_{kargs['dataset']}")
 
     # DataLoader
     train_ds, val_ds= get_dataset(data_dir,kargs)
@@ -138,9 +149,9 @@ def main():
     kargs['cmap'] = train_ds.getcmap()
     
     # Student, Teacher Model
-    student = models.model.__dict__[kargs['student']](num_classes=kargs['num_classes'],output_stride=kargs['output_stride']).to(device)
+    student = models.model.__dict__[kargs['student']](num_classes=kargs['num_classes'],output_stride=kargs['output_stride'],pretrained_backbone=False).to(device)
     teacher = models.model.__dict__[kargs['teacher']](num_classes=kargs['num_classes'],output_stride=kargs['output_stride']).to(device)
-    
+        
     # Optimizer
     optimizer = torch.optim.SGD(params=student.parameters(), lr=kargs['lr'], momentum=0.9, weight_decay=kargs['weight_decay'])
     
@@ -171,6 +182,7 @@ def main():
         epoch = 0
         while True:
             student.train()
+            teacher.eval()
             epoch += 1
             interval_loss = 0.0
             if cur_iter > kargs['total_iters']:
@@ -178,16 +190,18 @@ def main():
             for data in dataloaders['train']:
                 cur_iter += 1
                 images = data['image'].to(device,dtype=torch.float32)
-                targets = data['target'].squeeze(1).to(device,dtype=torch.long)
+                targets = data['target'].to(device,dtype=torch.long)
+                
                 outputs = student(images)
                 teacher_outputs = teacher(images)
 
-                optimizer.zero_grad()
                 loss = loss_distillation(outputs,targets,teacher_outputs)
+
+                optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
                 # Metric
-                interval_loss += loss.item().detach().cpu().numpy()
+                interval_loss += loss.detach().cpu().numpy()
                 # Tensorboard
                 if cur_iter % kargs['print_interval'] == 0:
                     interval_loss = interval_loss / kargs['print_interval']
