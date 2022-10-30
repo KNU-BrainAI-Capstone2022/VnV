@@ -14,7 +14,7 @@ def get_args():
     # model option
     parser.add_argument("--model", type=str, help="model name",required=True)
     # Dataset Options
-    parser.add_argument("--input", type=str, help="input video name",required=True)
+    parser.add_argument("--video", type=str, help="input video name",required=True)
     parser.add_argument("--pair", action='store_true', help="Generate pair frame")
     parser.add_argument("--test", action='store_true', help="Generate thunbnail")
 
@@ -32,13 +32,13 @@ if not os.path.exists(ckpt):
     exit(1)
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model = models.model.__dict__[kargs['model']](num_classes=19,output_stride=16).to(device)
+model = models.model.__dict__[kargs['model']](num_classes=19,output_stride=16,pretrained_backbone=False).to(device)
 
 dict_model = torch.load(ckpt)
 model.load_state_dict(dict_model['model_state'])
 
 # video write
-input_video = 'video/'+kargs['input']+'.mp4'
+input_video = 'video/'+kargs['video']+'.mp4'
 if not os.path.exists('./video'):
     os.mkdir('./video')
 if not os.path.exists(input_video):
@@ -53,10 +53,10 @@ print(f'video ({frame_width},{frame_height}), {fps} fps')
 
 fourcc = cv2.VideoWriter_fourcc(*'mp4v')
 if kargs['pair']:
-    out_name = 'video/'+kargs['input']+'_output_pair.mp4'
+    out_name = 'video/'+kargs['video']+'_'+kargs['model']+'_output_pair.mp4'
     out_cap = cv2.VideoWriter(out_name,fourcc,fps,(frame_width,2*frame_height))
 else:
-    out_name = 'video/'+kargs['input']+'_output.mp4'
+    out_name = 'video/'+kargs['video']+'_'+kargs['model']+'_output.mp4'
     out_cap = cv2.VideoWriter(out_name,fourcc,fps,(frame_width,frame_height))
 
 print(f'{input_video} encoding ...')
@@ -69,7 +69,7 @@ model.eval()
 total_frame=0
 with torch.no_grad():
     start = time.time()
-    while True:
+    while total_frame<30:
         ret, frame = cap.read()
         if not ret:
             print('cap.read is failed')
