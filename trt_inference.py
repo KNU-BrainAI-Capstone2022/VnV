@@ -115,14 +115,19 @@ if __name__=='__main__':
 
     onnx_model = onnx.load(onnx_file_path)
     onnx.checker.check_model(onnx_model)
-    session = onnxruntime.InferenceSession(onnx_file_path, providers=['CUDAExecutionProvider', 'CPUExecutionProvider'])
+    # # slow than pytorch
+    # session = onnxruntime.InferenceSession(onnx_file_path, providers=['CUDAExecutionProvider', 'CPUExecutionProvider'])
+    onnx_opt = onnxruntime.SessionOptions()
+    onnx_opt.graph_optimization_level = onnxruntime.GraphOptimizationLevel.ORT_ENABLE_ALL
+    session = onnxruntime.InferenceSession(onnx_file_path, onnx_opt, providers=['CUDAExecutionProvider','CPUExecutionProvider'])
+    
     binding = session.io_binding()
 
     total_frame=0
     with torch.no_grad():
         start = time.time()
         print("Start onnx Test...")
-        while total_frame<10:
+        while total_frame<30:
             print(total_frame)
             ret, frame = cap.read()
             if not ret:

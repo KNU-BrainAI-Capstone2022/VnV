@@ -69,7 +69,7 @@ model.eval()
 total_frame=0
 with torch.no_grad():
     start = time.time()
-    while total_frame<10:
+    while total_frame<30:
         ret, frame = cap.read()
         if not ret:
             print('cap.read is failed')
