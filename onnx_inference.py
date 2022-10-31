@@ -163,7 +163,7 @@ if __name__=='__main__':
         # # -------------------------------------------
         # inputs = F.to_tensor(frame).unsqueeze(0)
         # inputs = F.normalize(inputs,(0.485,0.456,0.406),(0.229,0.224,0.225))
-        # inputs = inputs.contiguous().to(device,dtype=torch.float16)
+        # inputs = inputs.contiguous().to(device,dtype=torch.float32)
         
         # binding.bind_input(
         #     name='inputs',
@@ -174,7 +174,7 @@ if __name__=='__main__':
         #     buffer_ptr=inputs.data_ptr(),
         #     )
         # ## Allocate the PyTorch tensor for the model output
-        # outputs = torch.empty((1,19,1080,1920), dtype=torch.float16,device='cuda:0').contiguous()
+        # outputs = torch.empty((1,19,1080,1920), dtype=torch.float32,device='cuda:0').contiguous()
         
         # binding.bind_output(
         #     name='outputs',
@@ -184,7 +184,6 @@ if __name__=='__main__':
         #     shape=tuple(outputs.shape),
         #     buffer_ptr=outputs.data_ptr(),
         # )
-
         # session.run_with_iobinding(binding)
 
         # # ort_output=OrtValue
@@ -192,7 +191,9 @@ if __name__=='__main__':
         # # ort_output = binding.copy_outputs_to_cpu()
         # img_out_y = ort_output.numpy()
 
+        # # -------------------------------------
         # # last
+        # # -------------------------------------
         # inputs = F.to_tensor(frame).unsqueeze(0)
         # inputs = F.normalize(inputs,(0.485,0.456,0.406),(0.229,0.224,0.225))
         # inputs = inputs.contiguous()
@@ -203,15 +204,15 @@ if __name__=='__main__':
         # # -------------------------------------
         # # input output is cpu
         # # -------------------------------------
-        inputs = frame / 255.0
-        inputs = np.transpose(inputs, (2,0,1))
-        inputs = (inputs- mean.reshape(-1,1,1)) / std.reshape(-1,1,1)
-        # print(inputs.shape)
-        inputs = np.expand_dims(inputs,axis=0).astype(np.float16)
-        # print(inputs.shape, inputs.dtype)
-        ortvalue = onnxruntime.OrtValue.ortvalue_from_numpy(inputs)
-        img_out_y = session.run(["outputs"], {"inputs": ortvalue})[0]
-        # print(img_out_y.shape, type(img_out_y))
+        # inputs = frame / 255.0
+        # inputs = np.transpose(inputs, (2,0,1))
+        # inputs = (inputs- mean.reshape(-1,1,1)) / std.reshape(-1,1,1)
+        # # print(inputs.shape)
+        # inputs = np.expand_dims(inputs,axis=0).astype(np.float16)
+        # # print(inputs.shape, inputs.dtype)
+        # ortvalue = onnxruntime.OrtValue.ortvalue_from_numpy(inputs)
+        # img_out_y = session.run(["outputs"], {"inputs": ortvalue})[0]
+        # # print(img_out_y.shape, type(img_out_y))
 
         img_out_y = np.squeeze(img_out_y,axis=0)
         img_out_y = np.argmax(img_out_y,axis=0)

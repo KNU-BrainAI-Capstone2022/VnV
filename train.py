@@ -146,6 +146,8 @@ def main():
             {'params': model.backbone.parameters(), 'lr': 0.1 * kargs['lr']},
             {'params': model.classifier.parameters(), 'lr': kargs['lr']},
         ], lr=kargs['lr'], momentum=0.9, weight_decay=kargs['weight_decay'])
+        # distilation 전용
+        # optimizer = torch.optim.SGD(params=model.parameters(), lr=kargs['lr'], momentum=0.9, weight_decay=kargs['weight_decay'])
         if kargs['lr_scheduler'] == 'exp':
             lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.9)
         elif kargs['lr_scheduler'] == 'step':
