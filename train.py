@@ -37,7 +37,7 @@ def get_args():
     parser.add_argument("--output_stride", type=int, default=16, choices=[8, 16]) # DeepLab Only
 
     # Train Options
-    parser.add_argument("--test_only",action="store_true",help="Only test the model")
+    parser.add_argument("--test",action="store_true",help="Only test the model")
     parser.add_argument("--save_results", action='store_true', default=False,help="save segmentation results")
     parser.add_argument("--total_iters", default=30000, type=int, help="number of total iterations to run (default: 30k)")
     parser.add_argument("--lr", default=1e-2, type=float, help="initial learning rate")
@@ -45,8 +45,8 @@ def get_args():
     parser.add_argument("--step_size", type=int, default=10000,help="(default: 10k)")
     parser.add_argument("--weight_decay",default=1e-4,type=float,help="weight_decay")
     parser.add_argument("--resume", action='store_true', default=False)
-    parser.add_argument("--print_interval", type=int, default=100,help="print interval of loss (default: 10)")
-    parser.add_argument("--val_interval", type=int, default=1000,help="iteration interval for eval (default: 100)")
+    parser.add_argument("--print_interval", type=int, default=100,help="print interval of loss (default: 100)")
+    parser.add_argument("--val_interval", type=int, default=1000,help="iteration interval for eval (default: 1000)")
 
     # tensorrt Options
     parser.add_argument("--trt", action="store_true", help="Can use tensorrt")
@@ -120,12 +120,15 @@ def main():
     # PATH
     root_dir = os.path.dirname(os.path.abspath(__file__))
     data_dir = os.path.join(root_dir,"dataset")
-    log_dir = os.path.join(root_dir,"logs")
-    os.makedirs(log_dir,exist_ok=True)
-    log_dir = os.path.join(log_dir,f"{kargs['model']}_{kargs['dataset']}")
-    ckpt_dir = os.path.join(root_dir,"checkpoint")
-    os.makedirs(ckpt_dir,exist_ok=True)
-    ckpt_dir = os.path.join(ckpt_dir,f"{kargs['model']}_{kargs['dataset']}")
+    if kargs['test']:
+        pass
+    else:
+        log_dir = os.path.join(root_dir,"logs")
+        os.makedirs(log_dir,exist_ok=True)
+        log_dir = os.path.join(log_dir,f"{kargs['model']}_{kargs['dataset']}")
+        ckpt_dir = os.path.join(root_dir,"checkpoint")
+        os.makedirs(ckpt_dir,exist_ok=True)
+        ckpt_dir = os.path.join(ckpt_dir,f"{kargs['model']}_{kargs['dataset']}")
 
     # DataLoader
     train_ds, val_ds= get_dataset(data_dir,kargs)
@@ -146,8 +149,6 @@ def main():
             {'params': model.backbone.parameters(), 'lr': 0.1 * kargs['lr']},
             {'params': model.classifier.parameters(), 'lr': kargs['lr']},
         ], lr=kargs['lr'], momentum=0.9, weight_decay=kargs['weight_decay'])
-        # distilation 전용
-        # optimizer = torch.optim.SGD(params=model.parameters(), lr=kargs['lr'], momentum=0.9, weight_decay=kargs['weight_decay'])
         if kargs['lr_scheduler'] == 'exp':
             lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.9)
         elif kargs['lr_scheduler'] == 'step':
@@ -160,7 +161,7 @@ def main():
     # Metric
     metrics = SegMetrics(kargs['num_classes'])
     # Test-only
-    if kargs['test_only']:
+    if kargs['test']:
         start=time.time()
         model.eval()
         val_score = validate(model,criterion,dataloaders['val'],metrics,device,kargs)

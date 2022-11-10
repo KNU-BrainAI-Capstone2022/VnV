@@ -1,0 +1,7 @@
+1. deeplabv3plus_mobilenet_distill_0.5_cityscapes
+lr = 1e-2, alpha = 0.5
+2. deeplabv3plus_mobilenet_distill_0.3_cityscapes
+lr = 1e-2, alpha = 0.3
++++++++++++++++++++++++++++++++++++++++++++++++++
+3. deeplabv3plus_mobilenet_distill_0.3_cityscapes1
+lr = 1e-3, alpha = 0.3

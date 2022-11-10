@@ -54,7 +54,7 @@ def get_args():
     parser.add_argument("--output_stride", type=int, default=16, choices=[8, 16]) # DeepLab Only
 
     # Train Options
-    parser.add_argument("--test_only",action="store_true",help="Only test the model")
+    parser.add_argument("--test",action="store_true",help="Only test the model")
     parser.add_argument("--save_results", action='store_true', default=False,help="save segmentation results")
     parser.add_argument("--total_iters", default=30000, type=int, help="number of total iterations to run (default: 30k)")
     parser.add_argument("--lr", default=1e-2, type=float, help="initial learning rate")
@@ -64,7 +64,9 @@ def get_args():
     parser.add_argument("--resume", action='store_true', default=False)
     parser.add_argument("--print_interval", type=int, default=100,help="print interval of loss (default: 10)")
     parser.add_argument("--val_interval", type=int, default=1000,help="iteration interval for eval (default: 100)")
-
+    
+    # Distillation Options
+    parser.add_argument("--alpha", default=0.1, type=float, help="distillation loss ratio")
     return parser.parse_args()
 
 def validate(model,criterion,dataloader,metrics,device,kargs):
@@ -137,11 +139,11 @@ def main():
     data_dir = os.path.join(root_dir,"dataset")
     log_dir = os.path.join(root_dir,"logs_distilation")
     os.makedirs(log_dir,exist_ok=True)
-    log_dir = os.path.join(log_dir,f"{kargs['student']}_{kargs['dataset']}")
+    log_dir = os.path.join(log_dir,f"{kargs['student']}_distill_{kargs['alpha']}_{kargs['dataset']}_{kargs['lr']}")
     ckpt_dir = os.path.join(root_dir,"checkpoint")
     os.makedirs(ckpt_dir,exist_ok=True)
     teacher_ckpt_dir = os.path.join(ckpt_dir,f"{kargs['teacher']}_{kargs['dataset']}")
-    ckpt_dir = os.path.join(ckpt_dir,f"{kargs['student']}_{kargs['dataset']}")
+    ckpt_dir = os.path.join(ckpt_dir,f"{kargs['student']}_distill_{kargs['alpha']}_{kargs['dataset']}_{kargs['lr']}")
 
     # DataLoader
     train_ds, val_ds= get_dataset(data_dir,kargs)
@@ -168,7 +170,7 @@ def main():
     # Loss (Validate)
     criterion = nn.CrossEntropyLoss(ignore_index=255)
     # Test-only
-    if kargs['test_only']:
+    if kargs['test']:
         start=time.time()
         student.eval()
         val_score = validate(student,criterion,dataloaders['val'],metrics,device,kargs)
@@ -198,7 +200,7 @@ def main():
                 outputs = student(images)
                 teacher_outputs = teacher(images)
 
-                loss = loss_distillation(outputs,targets,teacher_outputs)
+                loss = loss_distillation(outputs,targets,teacher_outputs,alpha=kargs['alpha'])
 
                 optimizer.zero_grad()
                 loss.backward()

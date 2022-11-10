@@ -78,7 +78,7 @@ def _fcn_resnet(name, backbone_name, num_classes,pretrained_backbone):
 
     return model
 
-def _load_model(arch_type, backbone, num_classes, output_stride=8, pretrained_backbone=True):
+def _load_model(arch_type, backbone, num_classes, output_stride=16, pretrained_backbone=True):
     if arch_type =='fcn':
         if backbone.startswith('resnet'):
             model = _fcn_resnet(arch_type, backbone,num_classes,pretrained_backbone)
@@ -91,7 +91,7 @@ def _load_model(arch_type, backbone, num_classes, output_stride=8, pretrained_ba
             model = _segm_mobilenet(arch_type, backbone, num_classes, output_stride=output_stride, pretrained_backbone=pretrained_backbone)
     return model
 
-def deeplabv3_resnet50(num_classes=21, output_stride=8, pretrained_backbone=True):
+def deeplabv3_resnet50(num_classes=21, output_stride=16, pretrained_backbone=True):
     """Constructs a DeepLabV3 model with a ResNet-50 backbone.
     Args:
         num_classes (int): number of classes.
@@ -100,7 +100,7 @@ def deeplabv3_resnet50(num_classes=21, output_stride=8, pretrained_backbone=True
     """
     return _load_model('deeplabv3', 'resnet50', num_classes, output_stride=output_stride, pretrained_backbone=pretrained_backbone)
 
-def deeplabv3_resnet101(num_classes=21, output_stride=8, pretrained_backbone=True):
+def deeplabv3_resnet101(num_classes=21, output_stride=16, pretrained_backbone=True):
     """Constructs a DeepLabV3 model with a ResNet-101 backbone.
     Args:
         num_classes (int): number of classes.
@@ -109,7 +109,7 @@ def deeplabv3_resnet101(num_classes=21, output_stride=8, pretrained_backbone=Tru
     """
     return _load_model('deeplabv3', 'resnet101', num_classes, output_stride=output_stride, pretrained_backbone=pretrained_backbone)
 
-def deeplabv3_mobilenet(num_classes=21, output_stride=8, pretrained_backbone=True, **kwargs):
+def deeplabv3_mobilenet(num_classes=21, output_stride=16, pretrained_backbone=True, **kwargs):
     """Constructs a DeepLabV3 model with a MobileNetv2 backbone.
     Args:
         num_classes (int): number of classes.
@@ -118,7 +118,7 @@ def deeplabv3_mobilenet(num_classes=21, output_stride=8, pretrained_backbone=Tru
     """
     return _load_model('deeplabv3', 'mobilenetv2', num_classes, output_stride=output_stride, pretrained_backbone=pretrained_backbone)
 
-def deeplabv3plus_resnet50(num_classes=21, output_stride=8, pretrained_backbone=True):
+def deeplabv3plus_resnet50(num_classes=21, output_stride=16, pretrained_backbone=True):
     """Constructs a DeepLabV3+ model with a ResNet-50 backbone.
     Args:
         num_classes (int): number of classes.
@@ -127,7 +127,7 @@ def deeplabv3plus_resnet50(num_classes=21, output_stride=8, pretrained_backbone=
     """
     return _load_model('deeplabv3plus', 'resnet50', num_classes, output_stride=output_stride, pretrained_backbone=pretrained_backbone)
 
-def deeplabv3plus_resnet101(num_classes=21, output_stride=8, pretrained_backbone=True):
+def deeplabv3plus_resnet101(num_classes=21, output_stride=16, pretrained_backbone=True):
     """Constructs a DeepLabV3+ model with a ResNet-101 backbone.
     Args:
         num_classes (int): number of classes.
@@ -136,7 +136,7 @@ def deeplabv3plus_resnet101(num_classes=21, output_stride=8, pretrained_backbone
     """
     return _load_model('deeplabv3plus', 'resnet101', num_classes, output_stride=output_stride, pretrained_backbone=pretrained_backbone)
 
-def deeplabv3plus_mobilenet(num_classes=21, output_stride=8, pretrained_backbone=True):
+def deeplabv3plus_mobilenet(num_classes=21, output_stride=16, pretrained_backbone=True):
     """Constructs a DeepLabV3+ model with a MobileNetv2 backbone.
     Args:
         num_classes (int): number of classes.
@@ -145,7 +145,7 @@ def deeplabv3plus_mobilenet(num_classes=21, output_stride=8, pretrained_backbone
     """
     return _load_model('deeplabv3plus', 'mobilenetv2', num_classes, output_stride=output_stride, pretrained_backbone=pretrained_backbone)
 
-def fcn_resnet50(num_classes=21, output_stride=8, pretrained_backbone=True):
+def fcn_resnet50(num_classes=21, output_stride=16, pretrained_backbone=True):
     """Constructs a FCN model with a ResNet-50 backbone.
     Args:
         num_classes (int): number of classes.
@@ -153,7 +153,7 @@ def fcn_resnet50(num_classes=21, output_stride=8, pretrained_backbone=True):
     """
     return _load_model('fcn','resnet50', num_classes, output_stride=output_stride, pretrained_backbone=pretrained_backbone)
 
-def fcn_resnet101(num_classes=21, output_stride=8, pretrained_backbone=True):
+def fcn_resnet101(num_classes=21, output_stride=16, pretrained_backbone=True):
     """Constructs a FCN model with a ResNet-101 backbone.
     Args:
         num_classes (int): number of classes.

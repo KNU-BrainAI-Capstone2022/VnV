@@ -184,51 +184,64 @@ class CustomCityscapesSegmentation(torch.utils.data.Dataset):
         return cmap
     
 def get_dataset(dir_path,karg):
+    if karg['test']: # for test.py
+        transform = Compose([
+                ToTensor(),
+                Normalize((0.485,0.456,0.406),(0.229,0.224,0.225)),
+            ])
+        if karg['dataset'] =='voc2012':
+            dataset = CustomVOCSegmentation(data_dir=dir_path,
+                                                image_set="val",
+                                                transform=transform)
+        if karg['dataset'] =='cityscapes':
+            dataset = CustomCityscapesSegmentation(data_dir=dir_path,
+                                                image_set="val",
+                                                transform=transform)
+        return dataset
+    else:
+        if karg['dataset'] =='voc2012': # from train.py
+            train_transform = Compose([
+                Resize(512),
+                RandomCrop(karg['crop_size'], pad_if_needed=True),
+                RandomHorizontalFlip(),
+                ToTensor(),
+                Normalize((0.485,0.456,0.406),(0.229,0.224,0.225)),
+                
+            ])
+            val_transform = Compose([
+                Resize(512),
+                ToTensor(),
+                Normalize((0.485,0.456,0.406),(0.229,0.224,0.225)),
+                
+            ])
 
-    if karg['dataset'] =='voc2012':
-        train_transform = Compose([
-            Resize(512),
-            RandomCrop(karg['crop_size'], pad_if_needed=True),
-            RandomHorizontalFlip(),
-            ToTensor(),
-            Normalize((0.485,0.456,0.406),(0.229,0.224,0.225)),
+            train_dataset = CustomVOCSegmentation(data_dir=dir_path,
+                                                image_set="train",
+                                                transform=train_transform)
+            val_dataset = CustomVOCSegmentation(data_dir=dir_path,
+                                                image_set="val",
+                                                transform=val_transform)
+
+        if karg['dataset'] =='cityscapes':
+            train_transform = Compose([
+                RandomCrop(karg['crop_size']),
+                ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5),
+                RandomHorizontalFlip(),
+                ToTensor(),
+                Normalize((0.485,0.456,0.406),(0.229,0.224,0.225)),
+            ])
+            val_transform = Compose([
+                ToTensor(),
+                Normalize((0.485,0.456,0.406),(0.229,0.224,0.225)),
+            ])
             
-        ])
-        val_transform = Compose([
-            Resize(512),
-            ToTensor(),
-            Normalize((0.485,0.456,0.406),(0.229,0.224,0.225)),
-            
-        ])
-
-        train_dataset = CustomVOCSegmentation(data_dir=dir_path,
-                                            image_set="train",
-                                            transform=train_transform)
-        val_dataset = CustomVOCSegmentation(data_dir=dir_path,
-                                            image_set="val",
-                                            transform=val_transform)
-
-    if karg['dataset'] =='cityscapes':
-        train_transform = Compose([
-            RandomCrop(karg['crop_size']),
-            ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5),
-            RandomHorizontalFlip(),
-            ToTensor(),
-            Normalize((0.485,0.456,0.406),(0.229,0.224,0.225)),
-        ])
-        val_transform = Compose([
-            ToTensor(),
-            Normalize((0.485,0.456,0.406),(0.229,0.224,0.225)),
-        ])
-        
-        train_dataset = CustomCityscapesSegmentation(data_dir=dir_path,
-                                            image_set="train",
-                                            transform=train_transform)
-        val_dataset = CustomCityscapesSegmentation(data_dir=dir_path,
-                                            image_set="val",
-                                            transform=val_transform)
-    
-    return train_dataset, val_dataset
+            train_dataset = CustomCityscapesSegmentation(data_dir=dir_path,
+                                                image_set="train",
+                                                transform=train_transform)
+            val_dataset = CustomCityscapesSegmentation(data_dir=dir_path,
+                                                image_set="val",
+                                                transform=val_transform)
+        return train_dataset, val_dataset
 
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
