@@ -27,8 +27,7 @@ if __name__=='__main__':
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = models.model.__dict__[kargs['model']](
-        num_classes=kargs['num_classes'],output_stride=kargs['output_stride'],pretrained_backbone=False
-        )
+        num_classes=kargs['num_classes'],pretrained_backbone=False)
     
     # load weight
     dict_model = torch.load(kargs['weights'])
