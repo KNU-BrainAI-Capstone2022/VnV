@@ -27,7 +27,7 @@ if __name__=='__main__':
     model = model.cuda()
     model = model.half()
     
-    input_size = torch.randn(1,3,1024,2048).cuda().half()
+    input_size = torch.randn(1,3,512,1024).cuda().half()
     #print(model)
     #y = model(input_size)
     
