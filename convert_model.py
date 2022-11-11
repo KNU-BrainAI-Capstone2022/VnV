@@ -76,7 +76,7 @@ if __name__=='__main__':
             save_name,                  # 모델 저장 경로
             verbose=True,              # 변환 과정
             export_params=True,         # 모델 파일 안에 학습된 모델 가중치 저장
-            opset_version = 11,         # onnx 버전
+            opset_version = kargs['onnx-ver'],         # onnx 버전
             input_names=['inputs'],      # 모델의 입력값을 가리키는 이름
             output_names= ['outputs'],   # 모델의 아웃풋 이름
             operator_export_type=torch.onnx.OperatorExportTypes.ONNX,
