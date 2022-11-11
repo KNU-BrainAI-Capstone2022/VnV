@@ -18,11 +18,11 @@ if __name__=='__main__':
                               not (name.startswith("__") or name.startswith('_')) and callable(
                               models.model.__dict__[name])
                               )
-    parser.add_argument("--model", choices=available_models, default="deeplabv3plus_resnet50", type=str, help="model name")
-    parser.add_argument("--weights", type=str,default='./checkpoint/deeplabv3plus_resnet50_cityscapes/model_best.pth', help='weight file path')
+    parser.add_argument("--model", choices=available_models, default="deeplabv3plus_mobilenet", type=str, help="model name")
+    parser.add_argument("--weights", type=str,default='./checkpoint/deeplabv3plus_mobilenet_cityscapes/model_best.pth', help='weight file path')
     parser.add_argument("--onnx", action='store_true', help='Create onnx fp32')
     parser.add_argument("--trt", action='store_true', help='Create tensorrt model')
-    parser.add_argument("--onnx-ver", type=int, default=11, help='Onnx version')
+    parser.add_argument("--onnx-ver", type=int, default=8, help='Onnx version')
     kargs = vars(parser.parse_args())
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
