@@ -24,12 +24,13 @@ if __name__=='__main__':
     parser.add_argument("--trt", action='store_true', help='Create tensorrt model')
     parser.add_argument("--onnx-ver", type=int, default=8, help='Onnx version')
     kargs = vars(parser.parse_args())
-
+    print(f'args : {kargs}')
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = models.model.__dict__[kargs['model']](
         num_classes=kargs['num_classes'],pretrained_backbone=False)
     
     # load weight
+    print(f'Load model....')
     dict_model = torch.load(kargs['weights'])
     model.load_state_dict(dict_model['model_state'])
 
