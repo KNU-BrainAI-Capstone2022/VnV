@@ -1,48 +1,36 @@
 import torch
-import os
-import cv2
 import argparse
-
-import models
+import os
+from models.model import deeplabv3plus_mobilenet
 import torch.onnx
 
-import pycuda.driver 
-import pycuda.autoinit
-from torch2trt import torch2trt, TRTModule
 
 if __name__=='__main__':
-
     parser = argparse.ArgumentParser(description="PyTorch Segmentation Training")
     parser.add_argument("--num_classes", type=int, default=19, help="num classes (default: 19, cityscapes)")
-    available_models = sorted(name for name in models.model.__dict__ if name.islower() and \
-                              not (name.startswith("__") or name.startswith('_')) and callable(
-                              models.model.__dict__[name])
-                              )
-    parser.add_argument("--model", choices=available_models, default="deeplabv3plus_mobilenet", type=str, help="model name")
     parser.add_argument("--weights", type=str,default='./checkpoint/deeplabv3plus_mobilenet_cityscapes/model_best.pth', help='weight file path')
     parser.add_argument("--onnx", action='store_true', help='Create onnx fp32')
     parser.add_argument("--trt", action='store_true', help='Create tensorrt model')
-    parser.add_argument("--onnx-ver", type=int, default=8, help='Onnx version')
+    parser.add_argument("--onnx-ver", type=int, default=14, help='Opset version ai.onnx')
     kargs = vars(parser.parse_args())
     print(f'args : {kargs}')
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = models.model.__dict__[kargs['model']](
-        num_classes=kargs['num_classes'],pretrained_backbone=False)
-    
+    print(device)
+    model = deeplabv3plus_mobilenet(num_classes=19,pretrained_backbone=False)
     # load weight
     print(f'Load model....')
-    dict_model = torch.load(kargs['weights'])
-    model.load_state_dict(dict_model['model_state'])
-
+    model_state= torch.load(kargs['weights'])
+    model.load_state_dict(model_state['model_state'])
+    del model_state
     # cityscape image size
-    frame_width = 2048
-    frame_height = 1024
-    model = model.eval()
-    model = model.to(device)
+    model.eval()
+    model = model.cuda()
     model = model.half()
     
-    input_size = torch.randn(1,3,frame_height,frame_width,requires_grad=True).to(device)
+    input_size = torch.randn(1,3,1024,2048).cuda().half()
     #print(model)
+    #y = model(input_size)
+    
     # torch --> onnx
     if kargs['onnx']:
         save_name = f"{kargs['weights'][:-4]}_jetson.onnx"
@@ -53,12 +41,13 @@ if __name__=='__main__':
             save_name,                  # 모델 저장 경로
             verbose=True,              # 변환 과정
             export_params=True,         # 모델 파일 안에 학습된 모델 가중치 저장
-            opset_version = kargs['onnx-ver'],         # onnx 버전
+            opset_version = kargs['onnx_ver'],         # onnx 버전
             input_names=['inputs'],      # 모델의 입력값을 가리키는 이름
             output_names= ['outputs'],   # 모델의 아웃풋 이름
-            operator_export_type=torch.onnx.OperatorExportTypes.ONNX,
+            operator_export_type = torch.onnx.OperatorExportTypes.ONNX,
+            do_constant_folding = False
         )
-        print(f"{kargs['model']}.pth -> onnx is done")
+        print(f"{kargs['weights']}.pth -> onnx is done")
 
     # onnx - > tensorrt
     # /usr/src/tensorrt/bin/trtexec --onnx= model.onnx --saveEngine=model.trt
