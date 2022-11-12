@@ -26,7 +26,7 @@ if __name__=='__main__':
     # cityscape image size
     model.eval()
     model = model.cuda().half()
-
+    
     input_size = torch.randn(1,3,1080,1920).cuda().half()
 
     # torch --> onnx
@@ -47,9 +47,18 @@ if __name__=='__main__':
         )
         print(f"{kargs['weights']}.pth -> onnx is done")
 
+    # onnx - > tensorrt
+    # /usr/src/tensorrt/bin/trtexec --onnx= model.onnx --saveEngine=model.trt
+
     if kargs['trt']:
         print(f'\nCreating trt fp16 file...')
         trt_model = torch2trt(model,[input_size], max_workspace_size=1<<23,fp16_mode=True,use_onnx=True)
+        # if kargs['video']:
+        #     torch.save(trt_model.state_dict(),f"{kargs['weights'][:-4]}_trt_fp16.pth")
+        #     print(f"\nTRTModule {kargs['weights'][:-4]}_trt_fp16.pth is Created")
+        # else:
+        #     torch.save(trt_model.state_dict(),f"{kargs['weights'][:-4]}_cityscapes_trt_fp16.pth")
+        #     print(f"\nTRTModule {kargs['weights'][:-4]}_cityscapes_trt_fp16.pth is Created")``
         torch.save(trt_model.state_dict(),f"{kargs['weights'][:-4]}_cityscapes_trt_fp16.pth")
         print(f"\nTRTModule {kargs['weights'][:-4]}_cityscapes_trt_fp16.pth is Created")
 
