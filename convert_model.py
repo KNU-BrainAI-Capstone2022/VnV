@@ -28,7 +28,7 @@ if __name__=='__main__':
     parser.add_argument("--jit", action='store_true', help='Create pytorch jit')
     parser.add_argument("--onnx", action='store_true', help='Create onnx fp32')
     parser.add_argument("--trt", action='store_true', help='Create tensorrt model')
-    parser.add_argument("--onnx-ver", type=int, default=11, help='Onnx version')
+    parser.add_argument("--onnx-ver", type=int, default=16, help='Onnx version')
     kargs = vars(parser.parse_args())
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

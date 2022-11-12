@@ -12,7 +12,6 @@ if __name__=='__main__':
     parser.add_argument("--onnx", action='store_true', help='Create onnx fp32')
     parser.add_argument("--trt", action='store_true', help='Create tensorrt model')
     parser.add_argument("--onnx-ver", type=int, default=14, help='Opset version ai.onnx')
-    parser.add_argument("--trt", action='store_true', help='Create tensorrt model')
 
     kargs = vars(parser.parse_args())
     print(f'args : {kargs}')
@@ -26,12 +25,9 @@ if __name__=='__main__':
     del model_state
     # cityscape image size
     model.eval()
-    model = model.cuda()
-    model = model.half()
-    
+    model = model.cuda().half()
+
     input_size = torch.randn(1,3,1080,1920).cuda().half()
-    #print(model)
-    #y = model(input_size)
 
     # torch --> onnx
     if kargs['onnx']:
@@ -47,22 +43,15 @@ if __name__=='__main__':
             input_names=['inputs'],      # 모델의 입력값을 가리키는 이름
             output_names= ['outputs'],   # 모델의 아웃풋 이름
             operator_export_type = torch.onnx.OperatorExportTypes.ONNX,
-            do_constant_folding = False
+            do_constant_folding = True
         )
         print(f"{kargs['weights']}.pth -> onnx is done")
 
-    # onnx - > tensorrt
-    # /usr/src/tensorrt/bin/trtexec --onnx= model.onnx --saveEngine=model.trt
-
     if kargs['trt']:
-         print(f'\nCreating trt fp16 file...')
-        trt_model = torch2trt(model,[input_size], max_workspace_size=1<<32,fp16_mode=True,use_onnx=True)
-        # if kargs['video']:
-        #     torch.save(trt_model.state_dict(),f"{kargs['weights'][:-4]}_trt_fp16.pth")
-        #     print(f"\nTRTModule {kargs['weights'][:-4]}_trt_fp16.pth is Created")
-        # else:
-        #     torch.save(trt_model.state_dict(),f"{kargs['weights'][:-4]}_cityscapes_trt_fp16.pth")
-        #     print(f"\nTRTModule {kargs['weights'][:-4]}_cityscapes_trt_fp16.pth is Created")``
+        print(f'\nCreating trt fp16 file...')
+        trt_model = torch2trt(model,[input_size], max_workspace_size=1<<23,fp16_mode=True,use_onnx=True)
         torch.save(trt_model.state_dict(),f"{kargs['weights'][:-4]}_cityscapes_trt_fp16.pth")
         print(f"\nTRTModule {kargs['weights'][:-4]}_cityscapes_trt_fp16.pth is Created")
+
+
         
