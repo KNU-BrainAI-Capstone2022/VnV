@@ -3,7 +3,7 @@ import argparse
 import os
 from models.model import deeplabv3plus_mobilenet
 import torch.onnx
-
+from torch2trt import torch2trt
 
 if __name__=='__main__':
     parser = argparse.ArgumentParser(description="PyTorch Segmentation Training")
@@ -12,10 +12,12 @@ if __name__=='__main__':
     parser.add_argument("--onnx", action='store_true', help='Create onnx fp32')
     parser.add_argument("--trt", action='store_true', help='Create tensorrt model')
     parser.add_argument("--onnx-ver", type=int, default=14, help='Opset version ai.onnx')
+    parser.add_argument("--trt", action='store_true', help='Create tensorrt model')
+
     kargs = vars(parser.parse_args())
     print(f'args : {kargs}')
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(device)
+    print(f'device : {device}')
     model = deeplabv3plus_mobilenet(num_classes=19,pretrained_backbone=False)
     # load weight
     print(f'Load model....')
@@ -27,10 +29,10 @@ if __name__=='__main__':
     model = model.cuda()
     model = model.half()
     
-    input_size = torch.randn(1,3,512,1024).cuda().half()
+    input_size = torch.randn(1,3,1080,1920).cuda().half()
     #print(model)
     #y = model(input_size)
-    
+
     # torch --> onnx
     if kargs['onnx']:
         save_name = f"{kargs['weights'][:-4]}_jetson.onnx"
@@ -51,3 +53,16 @@ if __name__=='__main__':
 
     # onnx - > tensorrt
     # /usr/src/tensorrt/bin/trtexec --onnx= model.onnx --saveEngine=model.trt
+
+    if kargs['trt']:
+         print(f'\nCreating trt fp16 file...')
+        trt_model = torch2trt(model,[input_size], max_workspace_size=1<<32,fp16_mode=True,use_onnx=True)
+        # if kargs['video']:
+        #     torch.save(trt_model.state_dict(),f"{kargs['weights'][:-4]}_trt_fp16.pth")
+        #     print(f"\nTRTModule {kargs['weights'][:-4]}_trt_fp16.pth is Created")
+        # else:
+        #     torch.save(trt_model.state_dict(),f"{kargs['weights'][:-4]}_cityscapes_trt_fp16.pth")
+        #     print(f"\nTRTModule {kargs['weights'][:-4]}_cityscapes_trt_fp16.pth is Created")``
+        torch.save(trt_model.state_dict(),f"{kargs['weights'][:-4]}_cityscapes_trt_fp16.pth")
+        print(f"\nTRTModule {kargs['weights'][:-4]}_cityscapes_trt_fp16.pth is Created")
+        
