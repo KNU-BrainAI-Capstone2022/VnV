@@ -1,7 +1,7 @@
 import torch
 import argparse
 import os
-from models.model import deeplabv3plus_resnet50
+from models.model import deeplabv3plus_resnet50,deeplabv3plus_mobilenet
 import torch.onnx
 from torch2trt import torch2trt
 import torchvision
@@ -12,7 +12,7 @@ if __name__=='__main__':
     parser.add_argument("--weights", type=str,default='./checkpoint/deeplabv3plus_resnet50_cityscapes/model_best.pth', help='weight file path')
     parser.add_argument("--onnx", action='store_true', help='Create onnx fp32')
     parser.add_argument("--trt", action='store_true', help='Create tensorrt model')
-    parser.add_argument("--onnx-ver", type=int, default=11, help='Opset version ai.onnx')
+    parser.add_argument("--onnx-ver", type=int, default=13, help='Opset version ai.onnx')
 
     kargs = vars(parser.parse_args())
     print(f'args : {kargs}')
@@ -20,7 +20,8 @@ if __name__=='__main__':
     print(f'device : {device}')
     if 'resnet' in kargs['weights']:
         model = deeplabv3plus_resnet50(num_classes=19,pretrained_backbone=False)
-    
+    elif 'mobilenet' in kargs['weights']:
+        model = deeplabv3plus_mobilenet(num_classes=kargs['num_classes'], pretrained_backbone=False)
     # load weight
     print(f'Load model....')
     model_state= torch.load(kargs['weights'])

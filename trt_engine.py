@@ -111,7 +111,7 @@ if __name__=='__main__':
         with engine.create_execution_context() as context:
             # Set input shape based on image dimensions for inference
             context.set_binding_shape(engine.get_binding_index("inputs"), (1, 3, frame_height, frame_width))
-            while True:
+            while total_frame <= 30:
                 ret, frame = cap.read()
                 if not ret:
                     print('cap.read is failed')
