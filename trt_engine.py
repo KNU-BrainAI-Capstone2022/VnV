@@ -58,20 +58,14 @@ def load_engine(engine_file_path):
     with open(engine_file_path, "rb") as f, trt.Runtime(TRT_LOGGER) as runtime:
         return runtime.deserialize_cuda_engine(f.read())
 
-def preprocess(image):
+def preprocess(data):
     # Mean normalization
     # mean = np.array([0.485, 0.456, 0.406]).astype('float32')
     # stddev = np.array([0.229, 0.224, 0.225]).astype('float32')
-    # data = (np.asarray(image).astype('float16') / float(255.0) - mean) / stddev
-    data=np.asarray(image).astype('float16')/255.0
+    # data = (np.asarray(data).astype('float16') / float(255.0) - mean) / stddev
+    data=np.asarray(data).astype('float16')/255.0
     # Switch from HWC to to CHW order
     return np.moveaxis(data, 2, 0)
-
-def postprocess(input_file):
-    num_classes = 19
-    data = np.argmax(data,axis=0)
-    img = mask_colorize(data,getcmap()).astype(np.uint8)
-    return img
 
 if __name__=='__main__':
     kargs = vars(get_args())
@@ -152,9 +146,13 @@ if __name__=='__main__':
                         break
                     frame = cv2.resize(frame,(frame_width,frame_height))
                     frame = cv2.cvtColor(frame,cv2.COLOR_BGR2RGB)
-                    input_image = np.ascontiguousarray(frame)
-                    input_image = preprocess(input_image)
+                    # Using numpy 
+                    # input_image = np.ascontiguousarray(frame)
+                    input_image = preprocess(frame)
 
+                    # Using tensor
+                    # input_image = F.to_tensor(frame)
+                    
                     bindings = []
                     for binding in engine:
                         binding_idx = engine.get_binding_index(binding)
@@ -182,8 +180,15 @@ if __name__=='__main__':
                     # Synchronize the stream
                     stream.synchronize()
 
-                    img = np.reshape(output_buffer,(19,frame_height,frame_width))
-                    img = np.argmax(img,axis=0)
+                    # Using tensor
+                    # img = torch.from_numpy(output_buffer)
+                    # img = torch.reshape(img,(19,frame_height,frame_width))
+                    # predict = predict.detach().argmax(dim=0).cpu().numpy()
+                    # img = mask_colorize(predict,cmap).astype(np.uint8)
+                    
+                    # Using numpy 
+                    # ------------------------------ 
+                    img = np.argmax(np.reshape(output_buffer,(19,frame_height,frame_width)),axis=0)
                     img = mask_colorize(img,cmap).astype(np.uint8)
                     
                     img = cv2.addWeighted(frame,0.3,img,0.7,0)
