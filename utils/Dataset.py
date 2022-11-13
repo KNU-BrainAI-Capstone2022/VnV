@@ -193,7 +193,7 @@ def get_dataset(dir_path,karg):
             dataset = CustomVOCSegmentation(data_dir=dir_path,
                                                 image_set="val",
                                                 transform=transform)
-        if karg['dataset'] =='cityscapes':
+        else: # cityscapes only have validation dataset
             dataset = CustomCityscapesSegmentation(data_dir=dir_path,
                                                 image_set="val",
                                                 transform=transform)

@@ -24,7 +24,7 @@ def save(ckpt_dir,model,optim,lr_scheduler,cur_iter,best_score,filename):
 # 모델 로드 함수
 def load(ckpt_dir,model,optim,lr_scheduler,kargs):
     if kargs['resume'] == True:
-        for f in os.listdir(ckpt_dir):
+        for f in sorted(os.listdir(ckpt_dir),reverse=True):
             if f.find("last") != -1:
                 ckpt = os.path.join(ckpt_dir,f)
                 break

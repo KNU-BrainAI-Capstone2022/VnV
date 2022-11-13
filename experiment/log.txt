@@ -1,0 +1,41 @@
+30000번을 고정 lr로 학습
+1. deeplabv3plus_mobilenet_distill_0.1_cityscapes_0.01
+
+Mean Loss: 0.254781
+Overall Acc: 0.917625
+Mean Acc: 0.596529
+Mean IoU: 0.514145
+
+Average Inference Time : 0.2073478889465332
+
+2. deeplabv3plus_mobilenet_distill_0.3_cityscapes_0.01
+
+Mean Loss: 0.252645
+Overall Acc: 0.918665
+Mean Acc: 0.613312
+Mean IoU: 0.524592
+
+Average Inference Time : 0.20676797103881836
+
+3. deeplabv3plus_mobilenet_distill_0.7_cityscapes_0.01
+
+Mean Loss: 0.284324
+Overall Acc: 0.910446
+Mean Acc: 0.552240
+Mean IoU: 0.473394
+
+Average Inference Time : 0.2082272434234619
+
+4. deeplabv3plus_mobilenet_distill_0.3_cityscapes_0.001
+
+Mean Loss: 0.381930
+Overall Acc: 0.881670
+Mean Acc: 0.446603
+Mean IoU: 0.373542
+
+Average Inference Time : 0.20834636545181273
+
++++++++++++++++++++++++++++++++++++++++++++++++++
+Step LR 적용해서 1,2,3을 30000번 추가 트레이닝
+5. deeplabv3plus_mobilenet_distill_0.1_cityscapes_0.01 - dev1
+6. deeplabv3plus_mobilenet_distill_0.3_cityscapes_0.01 - dev0

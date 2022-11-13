@@ -190,10 +190,10 @@ def main():
             teacher.eval()
             epoch += 1
             interval_loss = 0.0
-            if cur_iter > kargs['total_iters']:
-                break
             for data in dataloaders['train']:
                 cur_iter += 1
+                if cur_iter > kargs['total_iters']:
+                    break
                 images = data['image'].to(device,dtype=torch.float32)
                 targets = data['target'].to(device,dtype=torch.long)
                 
@@ -230,7 +230,9 @@ def main():
                     writer_val.add_figure('Images',fig,cur_iter)
                     writer_val.add_figure('Class IOU',iou_bar,cur_iter)
                     student.train()
-            lr_scheduler.step()
+                lr_scheduler.step()
+            if cur_iter > kargs['total_iters']:
+                break
         # total_time = time.time() - start_time + time_offset
         # writer_train.add_text("total time",str(datetime.timedelta(seconds=total_time)))
         writer_train.close()
