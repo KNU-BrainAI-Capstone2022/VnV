@@ -38,4 +38,19 @@ Average Inference Time : 0.20834636545181273
 +++++++++++++++++++++++++++++++++++++++++++++++++
 Step LR 적용해서 1,2,3을 30000번 추가 트레이닝
 5. deeplabv3plus_mobilenet_distill_0.1_cityscapes_0.01 - dev1
+
+Mean Loss: 0.214712
+Overall Acc: 0.929584
+Mean Acc: 0.670330
+Mean IoU: 0.580926
+
+Average Inference Time : 0.16732144165039062
+
 6. deeplabv3plus_mobilenet_distill_0.3_cityscapes_0.01 - dev0
+
+Mean Loss: 0.212623
+Overall Acc: 0.930433
+Mean Acc: 0.667486
+Mean IoU: 0.576995
+
+Average Inference Time : 0.16690499448776244
