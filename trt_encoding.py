@@ -90,7 +90,7 @@ if __name__=='__main__':
     # ----------------------------------------------
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     out_name = 'video/'+kargs['video']+'_'+kargs['dtype']+'_output.mp4'
-    out_cap = cv2.VideoWriter(out_name,fourcc,fps,(frame_width,2*frame_height))
+    out_cap = cv2.VideoWriter(out_name,fourcc,fps,(frame_width,frame_height))
     print(f'{input_video} encoding ...')
 
     # ----------------------------------------------

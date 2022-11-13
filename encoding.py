@@ -8,6 +8,32 @@ import numpy as np
 from utils import Dataset,Util
 import argparse
 
+
+def getcmap():
+    # cityscapes cmap
+    train_cmap = [
+        (128, 64, 128),
+        (244, 35, 232),
+        (70, 70, 70),
+        (102, 102, 156),
+        (190, 153, 153),
+        (153, 153, 153),
+        (250, 170, 30),
+        (220, 220, 0),
+        (107, 142, 35),
+        (152, 251, 152),
+        (70, 130, 180),
+        (220, 20, 60),
+        (255, 0, 0),
+        (0, 0, 142),
+        (0, 0, 70),
+        (0, 60, 100),
+        (0, 80, 100),
+        (0, 0, 230),
+        (119, 11, 32)
+    ]
+    return train_cmap
+
 def get_args():
 
     parser = argparse.ArgumentParser(description="PyTorch Segmentation Video Encoding")
@@ -49,7 +75,7 @@ if __name__=="__main__":
 
     frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    fps = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    fps = int(cap.get(cv2.CAP_PROP_FPS))
     print(f'video ({frame_width},{frame_height}), {fps} fps')
 
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
@@ -63,11 +89,11 @@ if __name__=="__main__":
     print(f'{input_video} encoding ...')
 
     # cmap load
-    classes = Dataset.CustomCityscapesSegmentation('dataset')
-    cmap = classes.getcmap()
+    cmap = getcmap()
 
     model.eval()
     total_frame=0
+    only_infer_time = 0
     with torch.no_grad():
         start = time.time()
         while True:
@@ -78,7 +104,9 @@ if __name__=="__main__":
             frame = cv2.cvtColor(frame,cv2.COLOR_BGR2RGB)
 
             predict = F.to_tensor(frame).unsqueeze(0).to(device, dtype=torch.float32)
+            only_run = time.time()
             predict = model(predict)
+            only_infer_time += time.time()-only_run
             predict = predict.detach().argmax(dim=1).squeeze(0).cpu().numpy()
             predict = Util.mask_colorize(predict,cmap).astype(np.uint8)
             
@@ -98,4 +126,5 @@ if __name__=="__main__":
     print(f'finish encoding - {out_name}')
     total_time = time.time()-start
     print(f'total frame = {total_frame} \ntotal time = {total_time:.2f}s')
-    print(f'average time = {total_time/total_frame:.2f}')
+    print(f'average time = {total_time/total_frame:.2f}s')
+    print(f'Only inference time : {only_infer_time:.2f}s')
