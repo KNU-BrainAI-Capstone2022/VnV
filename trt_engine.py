@@ -67,18 +67,13 @@ def preprocess(image):
 def postprocess(input_file):
     num_classes = 19
     data = np.argmax(data,axis=0)
-    print(data.shape)
     img = mask_colorize(data,getcmap()).astype(np.uint8)
-    print(img.shape)
-
     return img
 
 if __name__=='__main__':
     kargs = vars(get_args())
     TRT_LOGGER = trt.Logger()
     engine_file = kargs['engine']
-    input_file = "video/test.jpg"
-    output_file = 'test_out.jpg'
 
     # --------------------------------------------
     # video info check
@@ -101,17 +96,19 @@ if __name__=='__main__':
     # ----------------------------------------------
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     out_name = 'video/'+kargs['video']+'_'+kargs['dtype']+'_output.mp4'
-    out_cap = cv2.VideoWriter(out_name,fourcc,fps,(frame_width,2*frame_height))
+    out_cap = cv2.VideoWriter(out_name,fourcc,fps,(frame_width,frame_height))
     print(f'{input_video} encoding ...')
     
     # print("Running TensorRT e for deeplabv3plut-ResNet50")
     start = time.time()
     total_frame =0
+    only_infer_time = 0
+
     with load_engine(engine_file) as engine:
         with engine.create_execution_context() as context:
             # Set input shape based on image dimensions for inference
             context.set_binding_shape(engine.get_binding_index("inputs"), (1, 3, frame_height, frame_width))
-            while total_frame <= 30:
+            while total_frame < 30:
                 ret, frame = cap.read()
                 if not ret:
                     print('cap.read is failed')
@@ -119,8 +116,8 @@ if __name__=='__main__':
                     break
                 frame = cv2.resize(frame,(frame_width,frame_height))
                 frame = cv2.cvtColor(frame,cv2.COLOR_BGR2RGB)
-                frame = np.ascontiguousarray(frame)
-                input_image = preprocess(frame)
+                input_image = np.ascontiguousarray(frame)
+                input_image = preprocess(input_image)
 
                 bindings = []
                 for binding in engine:
@@ -140,7 +137,10 @@ if __name__=='__main__':
                 # Transfer input data to the GPU.
                 cuda.memcpy_htod_async(input_memory, input_buffer, stream)
                 # Run inference
+                only_run = time.time()
                 context.execute_async_v2(bindings=bindings, stream_handle=stream.handle)
+                only_infer_time += time.time()-only_run
+
                 # Transfer prediction output from the GPU.
                 cuda.memcpy_dtoh_async(output_buffer, output_memory, stream)
                 # Synchronize the stream
@@ -158,6 +158,7 @@ if __name__=='__main__':
     print(f'finish encoding - {out_name}')
     total_time = time.time()-start
     print(f'total frame = {total_frame} \ntotal time = {total_time:.2f}s')
-    print(f'average time = {total_time/total_frame:.2f}')
+    print(f'average time = {total_time/total_frame:.2f}s')
+    print(f'Only inference time : {only_infer_time:.2f}s')
     engine.__del__()
     
