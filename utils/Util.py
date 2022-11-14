@@ -56,7 +56,7 @@ def load_for_distilation(ckpt_dir,teacher_ckpt_dir,student,teacher,optim,lr_sche
     teacher.load_state_dict(torch.load(t_ckpt)['model_state'])
     
     if kargs['resume']:
-        for f in os.listdir(ckpt_dir):
+        for f in sorted(os.listdir(ckpt_dir),reverse=True):
             if f.find("last") != -1:
                 s_ckpt = os.path.join(ckpt_dir,f)
                 break
