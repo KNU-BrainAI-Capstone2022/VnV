@@ -20,7 +20,7 @@ except ImportError:
 def get_args():
     parser = argparse.ArgumentParser(description="PyTorch Segmentation Video Encoding")
     # model option
-    parser.add_argument("--engine", type=str, default="checkpoint/deeplabv3plus_mobilenet_cityscapes/model_best_jetson_fp16.engine",help="model weights path")
+    parser.add_argument("--engine", type=str, default="checkpoint/deeplabv3plus_resnet50_cityscapes/model_best_jetson_fp16.engine",help="model weights path")
     parser.add_argument("--dtype", type=str, choices=['fp32','fp16','int8'], default='fp16',help="weight dtype")
     # Dataset Options
     parser.add_argument("--video", type=str, help="input video name",required=True)
@@ -130,14 +130,21 @@ if __name__=='__main__':
                 total_frame +=1
 
     else:
+        # load engine
         with load_engine(engine_file) as engine:
+            # engine create
             with engine.create_execution_context() as context:
                 # Set input shape based on image dimensions for inference
-                context.set_binding_shape(engine.get_binding_index("inputs"), (1, 3, frame_height, frame_width))
+                context.set_binding_shape(
+                    engine.get_binding_index("inputs"),
+                    (1, 3, frame_height, frame_width)
+                    )
+                # input_image= np.zeros((540,960,3)).astype('float32')
                 # time setting
                 start = time.time()
                 total_frame =0
                 only_infer_time = 0
+                # read video
                 while total_frame < 30:
                     ret, frame = cap.read()
                     if not ret:
@@ -152,21 +159,25 @@ if __name__=='__main__':
 
                     # Using tensor
                     # input_image = F.to_tensor(frame)
-                    
                     bindings = []
                     for binding in engine:
+                        # find binding index
                         binding_idx = engine.get_binding_index(binding)
+                        # memory volum set 
                         size = trt.volume(context.get_binding_shape(binding_idx))
+                        # memory type set
                         dtype = trt.nptype(engine.get_binding_dtype(binding))
                         if engine.binding_is_input(binding):
                             input_buffer = np.ascontiguousarray(input_image)
+                            # memory alloc 
                             input_memory = cuda.mem_alloc(input_image.nbytes)
                             bindings.append(int(input_memory))
                         else:
                             output_buffer = cuda.pagelocked_empty(size, dtype)
                             output_memory = cuda.mem_alloc(output_buffer.nbytes)
                             bindings.append(int(output_memory))
-
+                    
+                    # generate cuda class
                     stream = cuda.Stream()
                     # Transfer input data to the GPU.
                     cuda.memcpy_htod_async(input_memory, input_buffer, stream)
