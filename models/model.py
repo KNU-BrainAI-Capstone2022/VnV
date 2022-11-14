@@ -36,8 +36,8 @@ def _segm_mobilenet(name, backbone_name, num_classes, output_stride, pretrained_
     else:
         aspp_dilate = [6, 12, 18]
 
-    # backbone = mobilenetv2.mobilenet_v2(pretrained=pretrained_backbone, output_stride=output_stride)
-    backbone = mobilenetv2.mobilenet_v2(pretrained=pretrained_backbone)
+    backbone = mobilenetv2.mobilenet_v2(pretrained=pretrained_backbone, output_stride=output_stride)
+    #backbone = mobilenetv2.mobilenet_v2(pretrained=pretrained_backbone)
     # rename layers
     backbone.low_level_features = backbone.features[0:4]
     backbone.high_level_features = backbone.features[4:18]

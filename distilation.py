@@ -70,17 +70,7 @@ def get_args():
     return parser.parse_args()
 
 def validate(model,criterion,dataloader,metrics,device,kargs):
-    
     metrics.reset()
-    if kargs['save_results']:
-        result_pth = os.path.join(os.getcwd(),'results_distilation')
-        if not os.path.exists(result_pth):
-            os.mkdir(result_pth)
-        result_pth= os.path.join(result_pth,f"{kargs['student']}_{kargs['dataset']}")
-        if not os.path.exists(result_pth):
-            os.mkdir(result_pth)
-    denorm = Denormalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-    img_id = 0
     with torch.no_grad():
         for data in dataloader:
             images = data['image'].to(device, dtype=torch.float32)
@@ -92,32 +82,6 @@ def validate(model,criterion,dataloader,metrics,device,kargs):
             targets = targets.cpu().numpy()
 
             metrics.update(targets, preds, loss)
-            
-            if kargs['save_results']:
-                for i in range(1):
-                    image = images[i].detach().cpu().numpy()
-                    target = targets[i]
-                    pred = preds[i]
-
-                    image = (denorm(image) * 255).transpose(1, 2, 0).astype(np.uint8)
-                    target = mask_colorize(target,kargs['cmap']).astype(np.uint8)
-                    pred = mask_colorize(pred,kargs['cmap']).astype(np.uint8)
-
-                    Image.fromarray(image).save(os.path.join(result_pth,'%d_image.png' % img_id))
-                    Image.fromarray(target).save(os.path.join(result_pth,'%d_target.png' % img_id))
-                    Image.fromarray(pred).save(os.path.join(result_pth,'%d_pred.png' % img_id))
-
-                    fig = plt.figure()
-                    plt.imshow(image)
-                    plt.axis('off')
-                    plt.imshow(pred, alpha=0.7)
-                    ax = plt.gca()
-                    ax.xaxis.set_major_locator(mpl.ticker.NullLocator())
-                    ax.yaxis.set_major_locator(mpl.ticker.NullLocator())
-                    plt.savefig(os.path.join(result_pth,'%d_overlay.png' % img_id), bbox_inches='tight', pad_inches=0)
-                    plt.close()
-                    img_id += 1
-
         score = metrics.get_results()
     return score
 
@@ -139,11 +103,11 @@ def main():
     data_dir = os.path.join(root_dir,"dataset")
     log_dir = os.path.join(root_dir,"logs_distilation")
     os.makedirs(log_dir,exist_ok=True)
-    log_dir = os.path.join(log_dir,f"{kargs['student']}_distill_{kargs['alpha']}_{kargs['dataset']}_{kargs['lr']}")
+    log_dir = os.path.join(log_dir,f"{kargs['student']}_new_distill_{kargs['alpha']}_{kargs['dataset']}_{kargs['lr']}")
     ckpt_dir = os.path.join(root_dir,"checkpoint")
     os.makedirs(ckpt_dir,exist_ok=True)
     teacher_ckpt_dir = os.path.join(ckpt_dir,f"{kargs['teacher']}_{kargs['dataset']}")
-    ckpt_dir = os.path.join(ckpt_dir,f"{kargs['student']}_distill_{kargs['alpha']}_{kargs['dataset']}_{kargs['lr']}")
+    ckpt_dir = os.path.join(ckpt_dir,f"{kargs['student']}_new_distill_{kargs['alpha']}_{kargs['dataset']}_{kargs['lr']}")
 
     # DataLoader
     train_ds, val_ds= get_dataset(data_dir,kargs)
@@ -230,7 +194,8 @@ def main():
                     writer_val.add_figure('Images',fig,cur_iter)
                     writer_val.add_figure('Class IOU',iou_bar,cur_iter)
                     student.train()
-                lr_scheduler.step()
+                if cur_iter > 30000: # 30000부터 step lr 적용
+                    lr_scheduler.step()
             if cur_iter > kargs['total_iters']:
                 break
         # total_time = time.time() - start_time + time_offset

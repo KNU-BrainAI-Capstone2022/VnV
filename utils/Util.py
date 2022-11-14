@@ -28,7 +28,7 @@ def load(ckpt_dir,model,optim,lr_scheduler,kargs):
             if f.find("last") != -1:
                 ckpt = os.path.join(ckpt_dir,f)
                 break
-    elif kargs['test_only'] == True:
+    elif kargs['test'] == True:
         ckpt = os.path.join(ckpt_dir,"model_best.pth")
     else:
         cur_iter = 0

@@ -1,3 +1,24 @@
+Previous Teacher - deeplabv3plus_resnet50_cityscapes
+
+Mean Loss: 0.145198
+Overall Acc: 0.951624
+Mean Acc: 0.801770
+Mean IoU: 0.721357
+
+Average Inference Time : 0.22784926509857178
+
+Teacher - deeplabv3plus_resnet101_cityscapes
+
+Mean Loss: 0.140055
+Overall Acc: 0.954228
+Mean Acc: 0.810030
+Mean IoU: 0.732492
+
+Average Inference Time : 0.24221090459823608
+
+Vanila - deeplabv3plus_mobilenet_cityscapes
+
+
 30000번을 고정 lr로 학습
 1. deeplabv3plus_mobilenet_distill_0.1_cityscapes_0.01
 
@@ -37,20 +58,39 @@ Average Inference Time : 0.20834636545181273
 
 +++++++++++++++++++++++++++++++++++++++++++++++++
 Step LR 적용해서 1,2,3을 30000번 추가 트레이닝
-5. deeplabv3plus_mobilenet_distill_0.1_cityscapes_0.01 - dev1
+5. deeplabv3plus_mobilenet_distill_0.1_cityscapes_0.01
 
 Mean Loss: 0.214712
 Overall Acc: 0.929584
 Mean Acc: 0.670330
 Mean IoU: 0.580926
 
-Average Inference Time : 0.16732144165039062
+Average Inference Time : 0.20017072057724
 
-6. deeplabv3plus_mobilenet_distill_0.3_cityscapes_0.01 - dev0
+6. deeplabv3plus_mobilenet_distill_0.3_cityscapes_0.01
 
 Mean Loss: 0.212623
 Overall Acc: 0.930433
 Mean Acc: 0.667486
 Mean IoU: 0.576995
 
-Average Inference Time : 0.16690499448776244
+Average Inference Time : 0.20752159357070923
+
+7. deeplabv3plus_mobilenet_distill_0.7_cityscapes_0.01
+
+Mean Loss: 0.231772
+Overall Acc: 0.925319
+Mean Acc: 0.633624
+Mean IoU: 0.547697
+
+Average Inference Time : 0.20456221437454222
+
+8. deeplabv3plus_mobilenet_new_distill_0.3_cityscapes_0.01 - dev0 : mobilenetv2 변환을 위한 새로운 구현(공식 pytorch 구현)
+
+Mean Loss: 0.344421
+Overall Acc: 0.891702
+Mean Acc: 0.507232
+Mean IoU: 0.419094
+
+Average Inference Time : 0.1648249373435974
+* 처음부터 steplr을 적용해서 30000 iteration 트레이닝하니까 Underfitting이 일어남. 처음에는 안하는게 좋겠음.
