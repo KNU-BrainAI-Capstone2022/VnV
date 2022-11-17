@@ -1,3 +1,5 @@
+import sys
+sys.path.append('../')
 import torch
 import time
 import numpy as np
@@ -7,6 +9,7 @@ import cv2
 from torch2trt import TRTModule
 import argparse
 from utils import Util
+from utils.Dataset import CustomCityscapesSegmentation
 import os
 
 def get_args():
@@ -18,38 +21,15 @@ def get_args():
     parser.add_argument("--video", type=str, help="input video name",required=True)
     return parser.parse_args()
 
-def getcmap():
-    # cityscapes cmap
-    train_cmap = [
-        (128, 64, 128),
-        (244, 35, 232),
-        (70, 70, 70),
-        (102, 102, 156),
-        (190, 153, 153),
-        (153, 153, 153),
-        (250, 170, 30),
-        (220, 220, 0),
-        (107, 142, 35),
-        (152, 251, 152),
-        (70, 130, 180),
-        (220, 20, 60),
-        (255, 0, 0),
-        (0, 0, 142),
-        (0, 0, 70),
-        (0, 60, 100),
-        (0, 80, 100),
-        (0, 0, 230),
-        (119, 11, 32)
-    ]
-    return train_cmap
-
 if __name__=='__main__':
     # model load``
     kargs=vars(get_args())
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # cmap load
-    cmap = getcmap()
+    cmap = CustomCityscapesSegmentation.cmap
+
+    print(cmap)
     # --------------------------------------------
     # load model
     # --------------------------------------------

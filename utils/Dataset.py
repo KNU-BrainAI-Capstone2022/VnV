@@ -126,6 +126,12 @@ class CustomCityscapesSegmentation(torch.utils.data.Dataset):
         CityscapesClass('bicycle', 33, 18, 'vehicle', 7, True, False, (119, 11, 32)),
         CityscapesClass('license plate', -1, -1, 'vehicle', 7, False, True, (0, 0, 142)),
     ]
+
+    cmap = []
+    for i in classes:
+        if i.train_id >=0 and i.train_id <19:
+            cmap.append(i.color)
+
     def __init__(self, data_dir, image_set="train", transform=None):
         self._ignore_index = [255]
         

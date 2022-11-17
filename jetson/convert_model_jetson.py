@@ -1,7 +1,7 @@
 import torch
 import argparse
 import os
-from models.model import deeplabv3plus_resnet50,deeplabv3plus_mobilenet
+from ..models.model import deeplabv3plus_resnet50,deeplabv3plus_mobilenet
 import torch.onnx
 from torch2trt import torch2trt
 import torchvision
@@ -9,7 +9,7 @@ import torchvision
 if __name__=='__main__':
     parser = argparse.ArgumentParser(description="PyTorch Segmentation Training")
     parser.add_argument("--num_classes", type=int, default=19, help="num classes (default: 19, cityscapes)")
-    parser.add_argument("--weights", type=str,default='./checkpoint/deeplabv3plus_resnet50_cityscapes/model_best.pth', help='weight file path')
+    parser.add_argument("--weights", type=str,default='../checkpoint/deeplabv3plus_resnet50_cityscapes/model_best.pth', help='weight file path')
     parser.add_argument("--onnx", action='store_true', help='Create onnx fp32')
     parser.add_argument("--trt", action='store_true', help='Create tensorrt model')
     parser.add_argument("--onnx-ver", type=int, default=13, help='Opset version ai.onnx')
