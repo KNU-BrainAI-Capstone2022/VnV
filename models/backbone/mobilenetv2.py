@@ -202,6 +202,7 @@ class MobileNetV2_jet(nn.Module):
     def __init__(
         self,
         num_classes= 1000,
+        output_stride= 8,
         width_mult= 1.0,
         inverted_residual_setting= None,
         round_nearest= 8,
@@ -291,7 +292,7 @@ class MobileNetV2_jet(nn.Module):
                 nn.init.normal_(m.weight, 0, 0.01)
                 nn.init.zeros_(m.bias)
 
-    def _forward_impl(self, x):
+    def forward(self, x):
         # This exists since TorchScript doesn't support inheritance, so the superclass method
         # (this one) needs to have a name other than `forward` that can be accessed in a subclass
         x = self.features(x)
@@ -312,10 +313,10 @@ def mobilenet_v2(pretrained=False, progress=True, **kwargs):
         progress (bool): If True, displays a progress bar of the download to stderr
     """
     # for desktop
-    model = MobileNetV2(**kwargs)
+    # model = MobileNetV2(**kwargs)
 
     # for jetson
-    # model = MobileNetV2_jet(**kwargs)
+    model = MobileNetV2_jet(**kwargs)
     
     if pretrained:
         state_dict = load_state_dict_from_url(model_urls['mobilenet_v2'],

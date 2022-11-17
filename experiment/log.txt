@@ -16,8 +16,14 @@ Mean IoU: 0.732492
 
 Average Inference Time : 0.24221090459823608
 
-Vanila - deeplabv3plus_mobilenet_cityscapes
+Vanila - deeplabv3plus_mobilenet_cityscapes (lr 0.01, 30k iteration)
 
+Mean Loss: 0.169100
+Overall Acc: 0.943569
+Mean Acc: 0.750175
+Mean IoU: 0.665676
+
+Average Inference Time : 0.16620617294311524
 
 30000번을 고정 lr로 학습
 1. deeplabv3plus_mobilenet_distill_0.1_cityscapes_0.01
@@ -94,3 +100,9 @@ Mean IoU: 0.419094
 
 Average Inference Time : 0.1648249373435974
 * 처음부터 steplr을 적용해서 30000 iteration 트레이닝하니까 Underfitting이 일어남. 처음에는 안하는게 좋겠음.
+
+------------------- overfitting 실험. lr = 0.01로 90k 트레이닝하면서 overfitting 지점 탐색-----------------
+
+9. deeplabv3plus_mobilenet_new_distill_0.1_0.01_fix_cityscapes
+
+10. deeplabv3plus_mobilenet_new_distill_0.3_0.01_fix_cityscapes

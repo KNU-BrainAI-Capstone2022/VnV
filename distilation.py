@@ -58,7 +58,7 @@ def get_args():
     parser.add_argument("--save_results", action='store_true', default=False,help="save segmentation results")
     parser.add_argument("--total_iters", default=30000, type=int, help="number of total iterations to run (default: 30k)")
     parser.add_argument("--lr", default=1e-2, type=float, help="initial learning rate")
-    parser.add_argument("--lr_scheduler", type=str, default='step', choices=['exp', 'step'],help="learning rate scheduler policy")
+    parser.add_argument("--lr_scheduler", type=str, default=None, choices=[None, 'exp', 'step'],help="learning rate scheduler policy")
     parser.add_argument("--step_size", type=int, default=10000,help="(default: 10k)")
     parser.add_argument("--weight_decay",default=1e-4,type=float,help="weight_decay")
     parser.add_argument("--resume", action='store_true', default=False)
@@ -103,11 +103,11 @@ def main():
     data_dir = os.path.join(root_dir,"dataset")
     log_dir = os.path.join(root_dir,"logs_distilation")
     os.makedirs(log_dir,exist_ok=True)
-    log_dir = os.path.join(log_dir,f"{kargs['student']}_new_distill_{kargs['alpha']}_{kargs['dataset']}_{kargs['lr']}")
+    log_dir = os.path.join(log_dir,f"{kargs['student']}_new_distill_{kargs['alpha']}_{kargs['lr']}_fix_{kargs['dataset']}")
     ckpt_dir = os.path.join(root_dir,"checkpoint")
     os.makedirs(ckpt_dir,exist_ok=True)
     teacher_ckpt_dir = os.path.join(ckpt_dir,f"{kargs['teacher']}_{kargs['dataset']}")
-    ckpt_dir = os.path.join(ckpt_dir,f"{kargs['student']}_new_distill_{kargs['alpha']}_{kargs['dataset']}_{kargs['lr']}")
+    ckpt_dir = os.path.join(ckpt_dir,f"{kargs['student']}_new_distill_{kargs['alpha']}_{kargs['lr']}_fix_{kargs['dataset']}")
 
     # DataLoader
     train_ds, val_ds= get_dataset(data_dir,kargs)
@@ -126,6 +126,8 @@ def main():
         lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.9)
     elif kargs['lr_scheduler'] == 'step':
         lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=kargs['step_size'], gamma=0.1)
+    else:
+        lr_scheduler = None
 
     # Load Checkpoint
     student, teacher, optimizer, lr_scheduler, cur_iter, best_score, = load_for_distilation(ckpt_dir,teacher_ckpt_dir,student,teacher,optimizer,lr_scheduler,kargs)
@@ -182,7 +184,7 @@ def main():
                     print("Validation")
                     val_score = validate(student,criterion,dataloaders['val'],metrics,device,kargs)
                     print(metrics.to_str(val_score))
-                    save(ckpt_dir,student,optimizer,lr_scheduler,cur_iter,best_score,f"model_last_{cur_iter}.pth")
+                    save(ckpt_dir,student,optimizer,lr_scheduler,cur_iter,best_score,f"model_{str(cur_iter).rjust(6,'0')}.pth")
                     if val_score['Mean IoU'] > best_score:  # save best model
                         best_score = val_score['Mean IoU']
                         save(ckpt_dir,student,optimizer,lr_scheduler,cur_iter,best_score,"model_best.pth")
@@ -194,7 +196,7 @@ def main():
                     writer_val.add_figure('Images',fig,cur_iter)
                     writer_val.add_figure('Class IOU',iou_bar,cur_iter)
                     student.train()
-                if cur_iter > 30000: # 30000부터 step lr 적용
+                if cur_iter > 30000 and lr_scheduler: # 30000부터 step lr 적용
                     lr_scheduler.step()
             if cur_iter > kargs['total_iters']:
                 break
