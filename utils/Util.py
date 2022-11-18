@@ -57,7 +57,7 @@ def load_for_distilation(ckpt_dir,teacher_ckpt_dir,student,teacher,optim,lr_sche
     
     if kargs['resume']:
         for f in sorted(os.listdir(ckpt_dir),reverse=True):
-            if f.find("last") != -1:
+            if f.find("best") == -1:
                 s_ckpt = os.path.join(ckpt_dir,f)
                 break
     else:

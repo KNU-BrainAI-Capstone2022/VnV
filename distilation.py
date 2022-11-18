@@ -58,7 +58,7 @@ def get_args():
     parser.add_argument("--save_results", action='store_true', default=False,help="save segmentation results")
     parser.add_argument("--total_iters", default=30000, type=int, help="number of total iterations to run (default: 30k)")
     parser.add_argument("--lr", default=1e-2, type=float, help="initial learning rate")
-    parser.add_argument("--lr_scheduler", type=str, default=None, choices=[None, 'exp', 'step'],help="learning rate scheduler policy")
+    parser.add_argument("--lr_scheduler", type=str, default='step', choices=['exp', 'step'],help="learning rate scheduler policy")
     parser.add_argument("--step_size", type=int, default=10000,help="(default: 10k)")
     parser.add_argument("--weight_decay",default=1e-4,type=float,help="weight_decay")
     parser.add_argument("--resume", action='store_true', default=False)
@@ -126,8 +126,6 @@ def main():
         lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.9)
     elif kargs['lr_scheduler'] == 'step':
         lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=kargs['step_size'], gamma=0.1)
-    else:
-        lr_scheduler = None
 
     # Load Checkpoint
     student, teacher, optimizer, lr_scheduler, cur_iter, best_score, = load_for_distilation(ckpt_dir,teacher_ckpt_dir,student,teacher,optimizer,lr_scheduler,kargs)
@@ -196,7 +194,7 @@ def main():
                     writer_val.add_figure('Images',fig,cur_iter)
                     writer_val.add_figure('Class IOU',iou_bar,cur_iter)
                     student.train()
-                if cur_iter > 30000 and lr_scheduler: # 30000부터 step lr 적용
+                if cur_iter > 1000000:
                     lr_scheduler.step()
             if cur_iter > kargs['total_iters']:
                 break
