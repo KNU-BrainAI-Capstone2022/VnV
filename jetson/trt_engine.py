@@ -23,7 +23,7 @@ except ImportError:
 def get_args():
     parser = argparse.ArgumentParser(description="PyTorch Segmentation Video Encoding")
     # model option
-    parser.add_argument("--engine", type=str, default="../checkpoint/deeplabv3plus_resnet50_cityscapes/model_best_jetson_fp16.engine",help="model weights path")
+    parser.add_argument("--engine", type=str, default="../checkpoint/deeplabv3plus_mobilenet_cityscapes/model_best_jetson_fp16.engine",help="model weights path")
     parser.add_argument("--dtype", type=str, choices=['fp32','fp16','int8'], default='fp16',help="weight dtype")
     # Dataset Options
     parser.add_argument("--video", type=str, help="input video name",required=True)
@@ -53,7 +53,7 @@ class HostDeviceMem(object):
         return self.__str__()
 
 class TrtModel:
-    def __init__(self,engine_path,dtype=np.float32):
+    def __init__(self,engine_path,dtype=np.float16):
         self.engine_path = engine_path
         self.dtype = dtype
         self.logger = trt.Logger(trt.Logger.WARNING)
@@ -63,6 +63,7 @@ class TrtModel:
         # memory 할당
         self.inputs, self.outputs, self.bindings, self.stream = self.allocate_buffers()
         self.context = self.engine.create_execution_context()
+        self.argmax = 
 
     @staticmethod
     def load_engine(trt_runtime, engine_path):
@@ -96,18 +97,21 @@ class TrtModel:
     def __call__(self,x:np.ndarray,batch_size=1):
         
         x = x.astype(self.dtype)
+        x = np.ascontiguousarray(x)
         
         np.copyto(self.inputs[0].host,x.ravel())
         
-        for inp in self.inputs:
-            cuda.memcpy_htod_async(inp.device, inp.host, self.stream)
-        
-        self.context.execute_async(batch_size=batch_size, bindings=self.bindings, stream_handle=self.stream.handle)
-        for out in self.outputs:
-            cuda.memcpy_dtoh_async(out.host, out.device, self.stream)
-            
+        [cuda.memcpy_htod_async(inp.device, inp.host, self.stream) for inp in self.inputs]
+        # infer time check
+        only_run = time.time()
+        self.context.execute_async_v2(batch_size=batch_size, bindings=self.bindings, stream_handle=self.stream.handle)
+        i_time = time.time()-only_run
+
+        [cuda.memcpy_dtoh_async(out.host, out.device, self.stream) for out in self.outputs]
+
         self.stream.synchronize()
-        return self.outputs.host
+
+        return [out.host.reshape(batch_size,-1) for out in self.outputs], i_time
 
     def __del__(self):
         if self.engine is not None:
@@ -188,16 +192,21 @@ if __name__=='__main__':
                 break
             frame = cv2.resize(frame,(frame_width,frame_height))
             frame = cv2.cvtColor(frame,cv2.COLOR_BGR2RGB)
+
             input_image = preprocess(frame)
 
-            outputs = model(input_image)
-
-            img = np.argmax(np.reshape(outputs,(19,frame_height,frame_width)),axis=0)
+            outputs,t = model(input_image)
+            print(len(output[0]))
+            break
+            only_infer_time +=t
+            # img = np.argmax(np.reshape(outputs[0],(19,frame_height,frame_width)),axis=0)
             img = mask_colorize(img,cmap).astype(np.uint8)
             img = cv2.addWeighted(frame,0.3,img,0.7,0)
             img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
             out_cap.write(img)
+            # cv2.imwrite('../video/test.jpg',img)
             total_frame +=1
+
         del model
 
     # else:

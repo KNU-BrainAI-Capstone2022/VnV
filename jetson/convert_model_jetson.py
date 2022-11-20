@@ -1,18 +1,20 @@
+import sys
+import os
+sys.path.append("../")
 import torch
 import argparse
-import os
-from ..models.model import deeplabv3plus_resnet50,deeplabv3plus_mobilenet
+from models.model import deeplabv3plus_resnet50,deeplabv3plus_mobilenet
 import torch.onnx
 from torch2trt import torch2trt
-import torchvision
 
 if __name__=='__main__':
     parser = argparse.ArgumentParser(description="PyTorch Segmentation Training")
     parser.add_argument("--num_classes", type=int, default=19, help="num classes (default: 19, cityscapes)")
-    parser.add_argument("--weights", type=str,default='../checkpoint/deeplabv3plus_resnet50_cityscapes/model_best.pth', help='weight file path')
+    parser.add_argument("--weights", type=str,default='../checkpoint/deeplabv3plus_mobilenet_cityscapes/model_best.pth', help='weight file path')
     parser.add_argument("--onnx", action='store_true', help='Create onnx fp32')
     parser.add_argument("--trt", action='store_true', help='Create tensorrt model')
     parser.add_argument("--onnx-ver", type=int, default=13, help='Opset version ai.onnx')
+    parser.add_argument("-O","--output", type=str, default=None)
 
     kargs = vars(parser.parse_args())
     print(f'args : {kargs}')
@@ -22,6 +24,8 @@ if __name__=='__main__':
         model = deeplabv3plus_resnet50(num_classes=19,pretrained_backbone=False)
     elif 'mobilenet' in kargs['weights']:
         model = deeplabv3plus_mobilenet(num_classes=kargs['num_classes'], pretrained_backbone=False)
+    
+
     # load weight
     print(f'Load model....')
     model_state= torch.load(kargs['weights'])
@@ -31,12 +35,16 @@ if __name__=='__main__':
     # cityscape image size
     model.eval()
     model = model.cuda().half()
-
+    
     input_size = torch.randn((1,3,540,960),dtype=torch.half,device=device)
+
     print(f'input shape : {input_size.shape} ({input_size.dtype})')
     # torch --> onnx
     if kargs['onnx']:
-        save_name = f"{kargs['weights'][:-4]}_jetson.onnx"
+        if kargs['output'] is None:
+            save_name = f"{kargs['weights'][:-4]}_jetson.onnx"
+        else:
+            save_name = os.path.join(os.path.dirname(kargs['weights']),kargs['output']+'_jetson.onnx')
         print(f'\nCreating onnx file...')
         torch.onnx.export(
             model,                      # 모델
@@ -49,10 +57,10 @@ if __name__=='__main__':
             output_names= ['outputs'],   # 모델의 아웃풋 이름
             operator_export_type = torch.onnx.OperatorExportTypes.ONNX
         )
-        print(f"{kargs['weights']}_jetson.pth -> onnx is done")
+        print(f"{save_name} -> onnx is done")
 
     # onnx - > tensorrt
-    # /usr/src/tensorrt/bin/trtexec --onnx=model_best_jetson.onnx --saveEngine=model_best_jetson_fp16.engine --fp16 --verbose
+    # /usr/src/tensorrt/bin/trtexec --onnx=model_best_jetson.onnx --saveEngine=model_best_jetson_fp16.engine --fp16 --verbose --buildOnly
     if kargs['trt']:
         print(f'\nCreating trt fp16 file...')
         trt_model = torch2trt(model,[input_size], max_workspace_size=1<<25,fp16_mode=True,use_onnx=True)
