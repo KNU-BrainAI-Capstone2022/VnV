@@ -120,7 +120,8 @@ def main():
     teacher = models.model.__dict__[kargs['teacher']](num_classes=kargs['num_classes'],output_stride=kargs['output_stride']).to(device)
         
     # Optimizer
-    optimizer = torch.optim.SGD(params=student.parameters(), lr=kargs['lr'], momentum=0.9, weight_decay=kargs['weight_decay'])
+    # optimizer = torch.optim.SGD(params=student.parameters(), lr=kargs['lr'], momentum=0.9, weight_decay=kargs['weight_decay'])
+    optimizer = torch.optim.Adam(params=student.parameters(), lr=kargs['lr'], weight_decay=kargs['weight_decay'])
     
     if kargs['lr_scheduler'] == 'exp':
         lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.9)
