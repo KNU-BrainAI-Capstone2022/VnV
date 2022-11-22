@@ -6,6 +6,7 @@ import argparse
 from models.model import deeplabv3plus_resnet50,deeplabv3plus_mobilenet
 import torch.onnx
 from torch2trt import torch2trt
+from utils_jet.model import WrappedModel, TestModel
 
 if __name__=='__main__':
     parser = argparse.ArgumentParser(description="PyTorch Segmentation Training")
@@ -27,16 +28,22 @@ if __name__=='__main__':
     
 
     # load weight
-    print(f'Load model....')
-    model_state= torch.load(kargs['weights'])
-    model.load_state_dict(model_state['model_state'])
-    del model_state
+    # print(f'Load model....')
+    # model_state= torch.load(kargs['weights'])
+    # model.load_state_dict(model_state['model_state'])
+    # del model_state
 
+    # wrapping
+    # model = WrappedModel(model)
+    input_shapes = (1,3,540,960)
+    
+    model = TestModel(kargs['num_classes'],input_shapes)
+    
     # cityscape image size
     model.eval()
     model = model.cuda().half()
     
-    input_size = torch.randn((1,3,540,960),dtype=torch.half,device=device)
+    input_size = torch.randn(input_shapes,dtype=torch.half,device=device)
 
     print(f'input shape : {input_size.shape} ({input_size.dtype})')
     # torch --> onnx

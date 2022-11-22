@@ -57,13 +57,18 @@ class TrtModel:
         self.engine_path = engine_path
         self.dtype = dtype
         self.logger = trt.Logger(trt.Logger.WARNING)
+        
+        # builder
+        self.builder = trt.Builder(self.logger)
+        self.network = builder.cerate_network()
+        self.config = builder.create_builder_config()
         self.runtime = trt.Runtime(self.logger)
+
         # Load engine
         self.engine = self.load_engine(self.runtime, self.engine_path)
         # memory 할당
         self.inputs, self.outputs, self.bindings, self.stream = self.allocate_buffers()
         self.context = self.engine.create_execution_context()
-        self.argmax = 
 
     @staticmethod
     def load_engine(trt_runtime, engine_path):
