@@ -53,7 +53,7 @@ class HostDeviceMem(object):
         return self.__str__()
 
 class TrtModel:
-    def __init__(self,engine_path,dtype=np.float16):
+    def __init__(self,engine_path=None,onnx_path=None,dtype=np.float16):
         self.engine_path = engine_path
         self.dtype = dtype
         self.logger = trt.Logger(trt.Logger.WARNING)
