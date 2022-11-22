@@ -1,5 +1,4 @@
 import torch
-import sys
 from torch import nn
 
 class WrappedModel(nn.Module):
@@ -25,16 +24,7 @@ class TestModel(nn.Module):
         self.argmax = torch.argmax
         
     def custom_argmax(self,x):
-        y = torch.zeros((self.h,self.w),dtype=torch.half)
-        for i in range(self.h):
-            for j in range(self.w):
-                max_idx = 0
-                max_val = -float("inf")
-                for k in range(self.num_classes):
-                    if max_val > x[0][k][i][j]:
-                        max_idx, max_val = k, x[0][k][i][j]
-                y[i][j] = max_idx
-        return y
+        return torch.argmax(x,dim=1).type(torch.half)
         
     def forward(self,x):
         x = self.layer(x)

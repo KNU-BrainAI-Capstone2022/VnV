@@ -201,7 +201,7 @@ if __name__=='__main__':
             input_image = preprocess(frame)
 
             outputs,t = model(input_image)
-            print(len(output[0]))
+            print(len(outputs[0]))
             break
             only_infer_time +=t
             # img = np.argmax(np.reshape(outputs[0],(19,frame_height,frame_width)),axis=0)

@@ -125,10 +125,10 @@ def main():
     else:
         log_dir = os.path.join(root_dir,"logs")
         os.makedirs(log_dir,exist_ok=True)
-        log_dir = os.path.join(log_dir,f"{kargs['model']}_{kargs['dataset']}")
+        log_dir = os.path.join(log_dir,f"{kargs['model']}_new_Adam_{kargs['dataset']}")
         ckpt_dir = os.path.join(root_dir,"checkpoint")
         os.makedirs(ckpt_dir,exist_ok=True)
-        ckpt_dir = os.path.join(ckpt_dir,f"{kargs['model']}_{kargs['dataset']}")
+        ckpt_dir = os.path.join(ckpt_dir,f"{kargs['model']}_new_Adam_{kargs['dataset']}")
 
     # DataLoader
     train_ds, val_ds= get_dataset(data_dir,kargs)
@@ -145,10 +145,15 @@ def main():
     else:
         model = models.model.__dict__[kargs['model']](num_classes=kargs['num_classes'],output_stride=kargs['output_stride']).to(device)
         # Optimizer
-        optimizer = torch.optim.SGD(params=[
+        # optimizer = torch.optim.SGD(params=[
+        #     {'params': model.backbone.parameters(), 'lr': 0.1 * kargs['lr']},
+        #     {'params': model.classifier.parameters(), 'lr': kargs['lr']},
+        # ], lr=kargs['lr'], momentum=0.9, weight_decay=kargs['weight_decay'])
+        optimizer = torch.optim.Adam(params=[
             {'params': model.backbone.parameters(), 'lr': 0.1 * kargs['lr']},
             {'params': model.classifier.parameters(), 'lr': kargs['lr']},
-        ], lr=kargs['lr'], momentum=0.9, weight_decay=kargs['weight_decay'])
+        ], lr=kargs['lr'], weight_decay=kargs['weight_decay'])
+
         if kargs['lr_scheduler'] == 'exp':
             lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.9)
         elif kargs['lr_scheduler'] == 'step':
@@ -218,7 +223,10 @@ def main():
                     writer_val.add_figure('Images',fig,cur_iter)
                     writer_val.add_figure('Class IOU',iou_bar,cur_iter)
                     model.train()
-            lr_scheduler.step()
+                if cur_iter > 1000000:
+                    lr_scheduler.step()
+            if cur_iter > kargs['total_iters']:
+                break
         # total_time = time.time() - start_time + time_offset
         # writer_train.add_text("total time",str(datetime.timedelta(seconds=total_time)))
         writer_train.close()
