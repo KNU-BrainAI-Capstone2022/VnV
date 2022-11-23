@@ -24,7 +24,8 @@ class TestModel(nn.Module):
         self.argmax = torch.argmax
         
     def custom_argmax(self,x):
-        return torch.argmax(x,dim=1).type(torch.half)
+        # return torch.argmax(x,dim=1).type(torch.half)
+        return torch.argmax(x,dim=1)
         
     def forward(self,x):
         x = self.layer(x)

@@ -1,3 +1,6 @@
+# onnx == 1.11.0
+# onnxruntime == 1.10.0
+
 import cv2
 import time
 import models
@@ -13,6 +16,7 @@ import pycuda.driver as cuda
 import pycuda.autoinit
 import onnx
 import onnxruntime
+
 
 # Read trt file
 def loadEngine2TensorRT(filepath):
