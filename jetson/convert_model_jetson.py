@@ -57,7 +57,7 @@ if __name__=='__main__':
     model.eval()
     model = model.cuda().half()
     
-    input_size = torch.randn(input_shapes,dtype=torch.half,device=device)
+    input_size = torch.randn(input_shapes,dtype=torch.half)
 
     print(f'input shape : {input_size.shape} ({input_size.dtype})')
     # torch --> onnx

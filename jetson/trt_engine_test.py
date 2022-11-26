@@ -11,12 +11,14 @@ import torchvision.transforms.functional as F
 from utils.Dataset import CustomCityscapesSegmentation
 from models.model import deeplabv3plus_mobilenet
 from torch2trt import TRTModule
-
+import onnx
+import onnxruntime
 
 try:
     import tensorrt as trt
     import pycuda.autoinit
     import pycuda.driver as cuda
+
 except ImportError:
     print("Failed to load tensorrt, pycuda")
     exit(1)
@@ -29,7 +31,7 @@ def get_args():
     parser.add_argument("--base", type=str, default="../checkpoint/deeplabv3plus_mobilenet_cityscapes/model_best.pth", help="Base model torch (.pth)")
     parser.add_argument("--dtype", type=str, choices=['fp32','fp16','int8'], default='fp16',help="weight dtype")
     # Dataset Options
-    parser.add_argument("--video", type=str, help="input video name",required=True)
+    parser.add_argument("--video", type=str, default="../video/220619_2.mp4",help="input video name")
     parser.add_argument("--torch", action='store_true', help="Using torch deeplabv3+_mobilenet model for inference")
     parser.add_argument("--test", action="store_true", help="testing create builder")
     parser.add_argument("--torch2trt", action="store_true", help="Using torch2trt module")
@@ -68,12 +70,15 @@ class TrtModel:
         # self.network = builder.cerate_network()
         # self.config = builder.create_builder_config()
         self.runtime = trt.Runtime(self.logger)
-
+    
         # Load engine
         self.engine = self.load_engine(self.runtime, self.engine_path)
+
         # memory 할당
         self.inputs, self.outputs, self.bindings, self.stream = self.allocate_buffers()
         self.context = self.engine.create_execution_context()
+
+        # print(f"engine.get_location -> {self.engine.get_location(0)}")
 
     @staticmethod
     def load_engine(trt_runtime, engine_path):
@@ -99,22 +104,30 @@ class TrtModel:
 
             if self.engine.binding_is_input(binding):
                 inputs.append(HostDeviceMem(host_mem, device_mem))
+                # print(f"input data host_mem : {host_mem}, device_mem :{device_mem}")
             else:
                 outputs.append(HostDeviceMem(host_mem, device_mem))
         
         return inputs, outputs, bindings, stream
 
-    def __call__(self,x:np.ndarray,batch_size=1):
+    def __call__(self,x,batch_size=1):
         
-        x = x.astype(self.dtype)
-        x = np.ascontiguousarray(x)
+        # -------------------------- torch tensor
+        x = x.half().contiguous()
+        # self.inputs[0].host = x.ravel()
+
+        # --------------------------- numpy
+        # x = x.astype(self.dtype)
+        # x = np.ascontiguousarray(x)
         
+        # # x.ravel is Returns to a continuous 1-dimensional plane
         np.copyto(self.inputs[0].host,x.ravel())
-        
+        # ----------------------------------------------
+
         [cuda.memcpy_htod_async(inp.device, inp.host, self.stream) for inp in self.inputs]
         # infer time check
         only_run = time.time()
-        self.context.execute_async(batch_size=batch_size, bindings=self.bindings, stream_handle=self.stream.handle)
+        check = self.context.execute_async_v2(bindings=self.bindings, stream_handle=self.stream.handle)
         i_time = time.time()-only_run
 
         [cuda.memcpy_dtoh_async(out.host, out.device, self.stream) for out in self.outputs]
@@ -155,6 +168,7 @@ class Load_engine:
             self.engine_path = onnx_path.replace(".onnx", ".engine")
         else:
             self.engine_path = engine_path
+
 
     def parse_or_load(self):
         logger = trt.Logger(trt.Logger.INFO)
@@ -247,6 +261,11 @@ class Load_engine:
                 
         return engine, logger
 
+def lib_version():
+    print(f"\ntrt version : {trt.__version__}")
+    print(f"torch version : {torch.__version__}")
+    print(f"onnx verison : {onnx.__version__}")
+    print(f"onnxruntime version : {onnxruntime.__version__}")
 
 
 if __name__=='__main__':
@@ -267,6 +286,9 @@ if __name__=='__main__':
     # cmap load
     cmap = CustomCityscapesSegmentation.cmap
 
+    # version print()
+    lib_version()
+    
     # --------------------------------------------
     # video info check
     # --------------------------------------------
@@ -288,10 +310,10 @@ if __name__=='__main__':
     out_cap = cv2.VideoWriter(out_name,fourcc,fps,(frame_width,frame_height))
     print(f"{kargs['video']} encoding ...")
 
-    if kargs['test']:
-        create_builder = Load_engine(onnx_path=kargs['onnx'])
-        e, l = create_builder.parse_or_load()
-        exit(1)
+    # if kargs['test']:
+    #     create_builder = Load_engine(onnx_path=kargs['onnx'])
+    #     e, l = create_builder.parse_or_load()
+    #     exit(1)
     
     if kargs['torch'] or kargs['torch2trt']:
         print("Running Pytorch\n")
@@ -321,39 +343,38 @@ if __name__=='__main__':
                 out_cap.write(result)
                 total_frame +=1
     else:
-        print("Running TRT Engine\n\n")
+        print("TRT Engine running...\n")
         model = TrtModel(engine_path)
         start = time.time()
         total_frame =0
         only_infer_time = 0
         # read video
-        while total_frame < 30:
+        while total_frame < 60:
             ret, frame = cap.read()
             if not ret:
                 print('cap.read is failed')
-                engine.__del__()
                 break
+            total_frame +=1
+            print(f'total_frame {total_frame}')
             frame = cv2.resize(frame,(frame_width,frame_height))
             frame = cv2.cvtColor(frame,cv2.COLOR_BGR2RGB)
 
-            input_image = preprocess(frame)
-
+            # input_image = preprocess(frame)
+            input_image = F.to_tensor(frame)
             outputs,t = model(input_image)
             # print(len(output[0]))
             
             only_infer_time +=t
-            img = torch.argmax(torch.from_numpy(outputs[0]).view((19,frame_height,frame_width)),dim=0)
-            img = np.array(mask_colorize(img,cmap))
+            # img = torch.argmax(torch.from_numpy(outputs[0]).view((19,frame_height,frame_width)),dim=0)
+            # img = np.array(mask_colorize(img,cmap))
 
-            # img = np.argmax(np.reshape(outputs[0],(19,frame_height,frame_width)),axis=0)
-            # img = mask_colorize(img,cmap).astype(np.uint8)
+            img = np.argmax(np.reshape(outputs[0],(19,frame_height,frame_width)),axis=0)
+            img = mask_colorize(img,cmap).astype(np.uint8)
             img = cv2.addWeighted(frame,0.3,img,0.7,0)
             img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+            
             out_cap.write(img)
             # cv2.imwrite('../video/test.jpg',img)
-            total_frame +=1
-
-        del model
 
 
     print(f'finish encoding - {out_name}')

@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from PIL import Image
 
 import torch
+from torchsummary import summary
 import torch.nn as nn
 import torch.nn.functional as F
 import torchvision
@@ -16,19 +17,9 @@ import models
 from utils import get_dataset,mask_colorize,make_figure,make_iou_bar,save,load,SegMetrics,Denormalize
 
 def loss_distillation(logits, labels, teacher_logits, T = 10, alpha = 0.1):
-    # # Method 1
-    # student_loss = F.cross_entropy(input=logits, target=labels, ignore_index=255)
-    # distillation_loss = nn.KLDivLoss(reduction='batchmean')(F.log_softmax(logits/T, dim=1), F.softmax(teacher_logits/T, dim=1)) * (T * T)
-    # total_loss =  alpha*student_loss + (1-alpha)*distillation_loss
-    # Method 2
     total_loss = nn.KLDivLoss()(F.log_softmax(logits/T, dim=1),
                              F.softmax(teacher_logits/T, dim=1)) * (alpha * T * T) + \
               F.cross_entropy(logits, labels, ignore_index=255) * (1. - alpha)
-    # # Method 3
-    # student_loss = F.cross_entropy(input=logits, target=labels, ignore_index=255)
-    # distillation_loss = (F.softmax(teacher_logits/T, dim=1) * (F.log_softmax(teacher_logits/T, dim=1) - F.log_softmax(logits/T, dim=1))).mean()
-    # total_loss =  alpha*student_loss + (1-alpha)*distillation_loss
-    
     return total_loss
 
 def get_args():
@@ -116,93 +107,101 @@ def main():
     kargs['cmap'] = train_ds.getcmap()
     
     # Student, Teacher Model
-    student = models.model.__dict__[kargs['student']](num_classes=kargs['num_classes'],output_stride=kargs['output_stride'],pretrained_backbone=False).to(device)
-    teacher = models.model.__dict__[kargs['teacher']](num_classes=kargs['num_classes'],output_stride=kargs['output_stride']).to(device)
+    # Deeplabv3plus
+    teacher = models.model.__dict__[kargs['teacher']](num_classes=kargs['num_classes'],output_stride=kargs['output_stride'])
+    student = models.model.__dict__[kargs['student']](num_classes=kargs['num_classes'],output_stride=kargs['output_stride'],pretrained_backbone=False)
+    
+    print(teacher._modules['classifier'])
+    print(student._modules['classifier'])
+    # student.load_state_dict()
+    # teacher._modules['classifier'].state_dict()
+    teacher.to(device)
+    student.to(device)
         
     # Optimizer
     # optimizer = torch.optim.SGD(params=student.parameters(), lr=kargs['lr'], momentum=0.9, weight_decay=kargs['weight_decay'])
-    optimizer = torch.optim.Adam(params=student.parameters(), lr=kargs['lr'], weight_decay=kargs['weight_decay'])
+    # optimizer = torch.optim.Adam(params=student.parameters(), lr=kargs['lr'], weight_decay=kargs['weight_decay'])
     
-    if kargs['lr_scheduler'] == 'exp':
-        lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.9)
-    elif kargs['lr_scheduler'] == 'step':
-        lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=kargs['step_size'], gamma=0.1)
+    # if kargs['lr_scheduler'] == 'exp':
+    #     lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.9)
+    # elif kargs['lr_scheduler'] == 'step':
+    #     lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=kargs['step_size'], gamma=0.1)
 
-    # Load Checkpoint
-    student, teacher, optimizer, lr_scheduler, cur_iter, best_score, = load_for_distilation(ckpt_dir,teacher_ckpt_dir,student,teacher,optimizer,lr_scheduler,kargs)
-    # Metric
-    metrics = SegMetrics(kargs['num_classes'])
-    # Loss (Validate)
-    criterion = nn.CrossEntropyLoss(ignore_index=255)
-    # Test-only
-    if kargs['test']:
-        start=time.time()
-        student.eval()
-        val_score = validate(student,criterion,dataloaders['val'],metrics,device,kargs)
-        end = time.time()
-        print(metrics.to_str(val_score))
-        print(f"Average Inference Time : {(end-start)/len(val_ds)}")
-    else:
-        # Tensorboard
-        writer_train = SummaryWriter(log_dir=os.path.join(log_dir,"train"))
-        writer_val = SummaryWriter(log_dir=os.path.join(log_dir,"val"))
+    # # Load Checkpoint
+    # student, teacher, optimizer, lr_scheduler, cur_iter, best_score, = load_for_distilation(ckpt_dir,teacher_ckpt_dir,student,teacher,optimizer,lr_scheduler,kargs)
+    # # Metric
+    # metrics = SegMetrics(kargs['num_classes'])
+    # # Loss (Validate)
+    # criterion = nn.CrossEntropyLoss(ignore_index=255)
+    # # Test-only
+    # if kargs['test']:
+    #     start=time.time()
+    #     student.eval()
+    #     val_score = validate(student,criterion,dataloaders['val'],metrics,device,kargs)
+    #     end = time.time()
+    #     print(metrics.to_str(val_score))
+    #     print(f"Average Inference Time : {(end-start)/len(val_ds)}")
+    # else:
+    #     # Tensorboard
+    #     writer_train = SummaryWriter(log_dir=os.path.join(log_dir,"train"))
+    #     writer_val = SummaryWriter(log_dir=os.path.join(log_dir,"val"))
 
-        # Train
-        start_time = time.time()
-        epoch = 0
-        while True:
-            student.train()
-            teacher.eval()
-            epoch += 1
-            interval_loss = 0.0
-            for data in dataloaders['train']:
-                cur_iter += 1
-                if cur_iter > kargs['total_iters']:
-                    break
-                images = data['image'].to(device,dtype=torch.float32)
-                targets = data['target'].to(device,dtype=torch.long)
+    #     # Train
+    #     start_time = time.time()
+    #     epoch = 0
+    #     while True:
+    #         student.train()
+    #         teacher.eval()
+    #         epoch += 1
+    #         interval_loss = 0.0
+    #         for data in dataloaders['train']:
+    #             cur_iter += 1
+    #             if cur_iter > kargs['total_iters']:
+    #                 break
+    #             images = data['image'].to(device,dtype=torch.float32)
+    #             targets = data['target'].to(device,dtype=torch.long)
                 
-                outputs = student(images)
-                teacher_outputs = teacher(images)
+    #             outputs = student(images)
+    #             teacher_outputs = teacher(images)
 
-                loss = loss_distillation(outputs,targets,teacher_outputs,alpha=kargs['alpha'])
+    #             loss = loss_distillation(outputs,targets,teacher_outputs,alpha=kargs['alpha'])
 
-                optimizer.zero_grad()
-                loss.backward()
-                optimizer.step()
-                # Metric
-                interval_loss += loss.detach().cpu().numpy()
-                # Tensorboard
-                if cur_iter % kargs['print_interval'] == 0:
-                    interval_loss = interval_loss / kargs['print_interval']
-                    print(f"EPOCH {epoch} | ITERATION {cur_iter} / {kargs['total_iters']:d} | LOSS {interval_loss:.4f}")
-                    writer_train.add_scalar('loss',interval_loss,cur_iter)
-                    interval_loss = 0.0
-                if cur_iter % kargs['val_interval'] == 0:
-                    student.eval()
-                    print("Validation")
-                    val_score = validate(student,criterion,dataloaders['val'],metrics,device,kargs)
-                    print(metrics.to_str(val_score))
-                    save(ckpt_dir,student,optimizer,lr_scheduler,cur_iter,best_score,f"model_{str(cur_iter).rjust(6,'0')}.pth")
-                    if val_score['Mean IoU'] > best_score:  # save best model
-                        best_score = val_score['Mean IoU']
-                        save(ckpt_dir,student,optimizer,lr_scheduler,cur_iter,best_score,"model_best.pth")
-                    # writer_val.add_scalar('Mean Acc',val_score['Mean Acc'],cur_iter)
-                    writer_val.add_scalar('loss',val_score['Mean Loss'],cur_iter)
-                    writer_val.add_scalar('mIOU',val_score['Mean IoU'],cur_iter)
-                    fig = make_figure(images.detach().cpu(),targets.cpu(),outputs.detach().cpu(),kargs['cmap'])
-                    iou_bar = make_iou_bar(np.nan_to_num(val_score['Class IoU'].values()))
-                    writer_val.add_figure('Images',fig,cur_iter)
-                    writer_val.add_figure('Class IOU',iou_bar,cur_iter)
-                    student.train()
-                if cur_iter > 1000000:
-                    lr_scheduler.step()
-            if cur_iter > kargs['total_iters']:
-                break
-        # total_time = time.time() - start_time + time_offset
-        # writer_train.add_text("total time",str(datetime.timedelta(seconds=total_time)))
-        writer_train.close()
-        writer_val.close()
+    #             optimizer.zero_grad()
+    #             loss.backward()
+    #             optimizer.step()
+    #             # Metric
+    #             interval_loss += loss.detach().cpu().numpy()
+    #             # Tensorboard
+    #             if cur_iter % kargs['print_interval'] == 0:
+    #                 interval_loss = interval_loss / kargs['print_interval']
+    #                 print(f"EPOCH {epoch} | ITERATION {cur_iter} / {kargs['total_iters']:d} | LOSS {interval_loss:.4f}")
+    #                 writer_train.add_scalar('loss',interval_loss,cur_iter)
+    #                 interval_loss = 0.0
+    #             if cur_iter % kargs['val_interval'] == 0:
+    #                 student.eval()
+    #                 print("Validation")
+    #                 val_score = validate(student,criterion,dataloaders['val'],metrics,device,kargs)
+    #                 print(metrics.to_str(val_score))
+    #                 save(ckpt_dir,student,optimizer,lr_scheduler,cur_iter,best_score,f"model_{str(cur_iter).rjust(6,'0')}.pth")
+    #                 if val_score['Mean IoU'] > best_score:  # save best model
+    #                     best_score = val_score['Mean IoU']
+    #                     save(ckpt_dir,student,optimizer,lr_scheduler,cur_iter,best_score,"model_best.pth")
+    #                 # writer_val.add_scalar('Mean Acc',val_score['Mean Acc'],cur_iter)
+    #                 writer_val.add_scalar('loss',val_score['Mean Loss'],cur_iter)
+    #                 writer_val.add_scalar('mIOU',val_score['Mean IoU'],cur_iter)
+    #                 fig = make_figure(images.detach().cpu(),targets.cpu(),outputs.detach().cpu(),kargs['cmap'])
+    #                 iou_bar = make_iou_bar(np.nan_to_num(val_score['Class IoU'].values()))
+    #                 writer_val.add_figure('Images',fig,cur_iter)
+    #                 writer_val.add_figure('Class IOU',iou_bar,cur_iter)
+    #                 student.train()
+    #             if cur_iter > 1000000:
+    #                 lr_scheduler.step()
+    #         if cur_iter > kargs['total_iters']:
+    #             break
+    #     # total_time = time.time() - start_time + time_offset
+    #     # writer_train.add_text("total time",str(datetime.timedelta(seconds=total_time)))
+    #     writer_train.close()
+    #     writer_val.close()
 
 if __name__=="__main__":
     main()

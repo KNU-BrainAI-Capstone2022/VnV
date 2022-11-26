@@ -101,8 +101,18 @@ Mean IoU: 0.419094
 Average Inference Time : 0.1648249373435974
 * 처음부터 steplr을 적용해서 30000 iteration 트레이닝하니까 Underfitting이 일어남. 처음에는 안하는게 좋겠음.
 
-------------------- overfitting 실험. lr = 0.01로 90k 트레이닝하면서 overfitting 지점 탐색-----------------
+------------------- distillation overfitting 실험. lr = 0.01로 90k 트레이닝하면서 overfitting 지점 탐색-----------------
 
 9. deeplabv3plus_mobilenet_new_distill_0.1_0.01_fix_cityscapes
-
+180k 학습
+Best: 166000 0.6537775298094433
 10. deeplabv3plus_mobilenet_new_distill_0.3_0.01_fix_cityscapes
+180k 학습
+Best: 178000 0.6354760743402625
+
+* loss가 진동하여 overfitting 까진 아니지만 학습이 더뎌짐.
+------------------- mobilenet training. lr = 0.01로 90k 트레이닝하면서 overfitting 지점 탐색-----------------
+11. deeplabv3plus_mobilenet_new_Adam_cityscapes
+90k 학습
+Best: 83000 0.6826459922824611
+추가 90k 학습
