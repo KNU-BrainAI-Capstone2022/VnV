@@ -349,7 +349,7 @@ if __name__=='__main__':
         total_frame =0
         only_infer_time = 0
         # read video
-        while total_frame < 60:
+        while True:
             ret, frame = cap.read()
             if not ret:
                 print('cap.read is failed')

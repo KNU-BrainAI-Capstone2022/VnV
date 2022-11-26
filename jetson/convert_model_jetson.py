@@ -31,7 +31,7 @@ if __name__=='__main__':
     print(f'device : {device}')
 
     if 'resnet' in kargs['weights']:
-        model = deeplabv3plus_resnet50(num_classes=19,pretrained_backbone=False)
+        model = deeplabv3plus_resnet50(num_classes=kargs['num_classes'],pretrained_backbone=False)
     elif 'mobilenet' in kargs['weights']:
         model = deeplabv3plus_mobilenet(num_classes=kargs['num_classes'], pretrained_backbone=False)
     
@@ -57,9 +57,10 @@ if __name__=='__main__':
     model.eval()
     model = model.cuda().half()
     
-    input_size = torch.randn(input_shapes,dtype=torch.half)
+    input_size = torch.randn(input_shapes,dtype=torch.half).cuda()
 
     print(f'input shape : {input_size.shape} ({input_size.dtype})')
+
     # torch --> onnx
     if kargs['onnx']:
 
