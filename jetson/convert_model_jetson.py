@@ -50,7 +50,7 @@ if __name__=='__main__':
     # model = WrappedModel(model)
     
     # Test
-    input_shapes = (1,3,540,960)
+    input_shapes = (1,3,270,480)
     # model = TestModel(kargs['num_classes'],input_shapes)
     
     # cityscape image size
@@ -86,6 +86,7 @@ if __name__=='__main__':
     # torch -> tensorrt 
     if kargs['trt']:
         input_size = input_size.cuda()
+        #out = model(input_size)
         if kargs['int8']:
             print(f'\nCreating trt int8 file...')
             trt_model = torch2trt(model,[input_size], max_workspace_size=1<<32,int8_mode=True,use_onnx=True,onnx_opset=kargs['onnx_opset'])

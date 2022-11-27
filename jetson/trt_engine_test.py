@@ -18,7 +18,6 @@ try:
     import tensorrt as trt
     import pycuda.autoinit
     import pycuda.driver as cuda
-
 except ImportError:
     print("Failed to load tensorrt, pycuda")
     exit(1)
@@ -273,10 +272,10 @@ if __name__=='__main__':
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     lib_version()
     if kargs['torch']:
-        model = deeplabv3plus_mobilenet["deeplabv3plus_mobilenet"](num_classes=19,output_stride=16,pretrained_backbone=False).to(device)
+        model = deeplabv3plus_mobilenet(num_classes=19,output_stride=16,pretrained_backbone=False).to(device, dtype=torch.half)
         model_path = kargs['base']
         print(f"{model_path} model loading ...")
-        model.load_state_dict(torch.load(model_path))
+        model.load_state_dict(torch.load(model_path)['model_state'])
         model.eval()
     elif kargs['torch2trt']:
         model = TRTModule()
@@ -290,8 +289,8 @@ if __name__=='__main__':
     # cmap load
     cmap = CustomCityscapesSegmentation.cmap
     print("check")
-    # version print()
     
+    # version print()
     # --------------------------------------------
     # video info check
     # --------------------------------------------
@@ -318,6 +317,7 @@ if __name__=='__main__':
     #     e, l = create_builder.parse_or_load()
     #     exit(1)
     
+    
     if kargs['torch'] or kargs['torch2trt']:
         print("Running Pytorch\n")
         total_frame=0
@@ -329,16 +329,17 @@ if __name__=='__main__':
                 if not ret:
                     print('cap.read is failed')
                     break
+                
                 frame = cv2.resize(frame, (frame_width,frame_height))
                 frame = cv2.cvtColor(frame,cv2.COLOR_BGR2RGB)
                 input_image = F.to_tensor(frame).unsqueeze(0).half().cuda()
                 #input_image = F.to_tensor(frame).unsqueeze(0)
-                #print("before inference")
+                print(f"total frame : {total_frame}")
                 only_run = time.time()
                 predict = model(input_image)
                 only_infer_time += time.time()-only_run
                 #print(predict.shape)
-                predict = predict.squeeze(0).argmax(dim=0).detach().cpu().numpy()
+                predict = predict.squeeze(0).argmax(dim=0).cpu().numpy()
                 predict = mask_colorize(predict,cmap).astype(np.uint8)
                 
                 result = cv2.addWeighted(frame,0.3,predict,0.7,0)
