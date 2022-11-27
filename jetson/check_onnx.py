@@ -2,7 +2,7 @@ import sys
 import onnx 
 import onnx_graphsurgeon as gs
 
-file_name = '../checkpoint/deeplabv3plus_mobilenet_cityscapes/test_jetson.onnx'
+file_name = '../checkpoint/deeplabv3plus_mobilenet_cityscapes/model_best_jetson.onnx'
 model = onnx.load(file_name)
 
 onnx.checker.check_model(model,full_check=True)

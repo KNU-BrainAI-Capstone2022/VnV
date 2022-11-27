@@ -113,12 +113,12 @@ class TrtModel:
     def __call__(self,x,batch_size=1):
         
         # -------------------------- torch tensor
-        x = x.half().contiguous()
+        # x = x.half().contiguous()
         # self.inputs[0].host = x.ravel()
 
         # --------------------------- numpy
-        # x = x.astype(self.dtype)
-        # x = np.ascontiguousarray(x)
+        x = x.astype(self.dtype)
+        x = np.ascontiguousarray(x)
         
         # # x.ravel is Returns to a continuous 1-dimensional plane
         np.copyto(self.inputs[0].host,x.ravel())
@@ -271,23 +271,26 @@ def lib_version():
 if __name__=='__main__':
     kargs = vars(get_args())
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    lib_version()
     if kargs['torch']:
         model = deeplabv3plus_mobilenet["deeplabv3plus_mobilenet"](num_classes=19,output_stride=16,pretrained_backbone=False).to(device)
         model_path = kargs['base']
+        print(f"{model_path} model loading ...")
         model.load_state_dict(torch.load(model_path))
         model.eval()
     elif kargs['torch2trt']:
         model = TRTModule()
         model_path = kargs['base'].replace(".pth","_jetson_trt_fp16.pth")
+        print(f"{model_path} model loading ....")
         model.load_state_dict(torch.load(model_path))
     else:
         TRT_LOGGER = trt.Logger()
         engine_path = kargs['engine']
+        print(f"{engine_path} engine loading ...")
     # cmap load
     cmap = CustomCityscapesSegmentation.cmap
-
+    print("check")
     # version print()
-    lib_version()
     
     # --------------------------------------------
     # video info check
@@ -328,13 +331,14 @@ if __name__=='__main__':
                     break
                 frame = cv2.resize(frame, (frame_width,frame_height))
                 frame = cv2.cvtColor(frame,cv2.COLOR_BGR2RGB)
-                input_image = F.to_tensor(frame).unsqueeze(0).to(device, dtype=torch.float16)
-
+                input_image = F.to_tensor(frame).unsqueeze(0).half().cuda()
+                #input_image = F.to_tensor(frame).unsqueeze(0)
+                #print("before inference")
                 only_run = time.time()
                 predict = model(input_image)
                 only_infer_time += time.time()-only_run
-
-                predict = predict.detach().squeeze(0).argmax(dim=0).cpu().numpy()
+                #print(predict.shape)
+                predict = predict.squeeze(0).argmax(dim=0).detach().cpu().numpy()
                 predict = mask_colorize(predict,cmap).astype(np.uint8)
                 
                 result = cv2.addWeighted(frame,0.3,predict,0.7,0)
@@ -349,18 +353,17 @@ if __name__=='__main__':
         total_frame =0
         only_infer_time = 0
         # read video
-        while True:
+        while total_frame < 30:
             ret, frame = cap.read()
             if not ret:
                 print('cap.read is failed')
                 break
             total_frame +=1
-            print(f'total_frame {total_frame}')
             frame = cv2.resize(frame,(frame_width,frame_height))
             frame = cv2.cvtColor(frame,cv2.COLOR_BGR2RGB)
 
-            # input_image = preprocess(frame)
-            input_image = F.to_tensor(frame)
+            input_image = preprocess(frame)
+            # input_image = F.to_tensor(frame)
             outputs,t = model(input_image)
             # print(len(output[0]))
             

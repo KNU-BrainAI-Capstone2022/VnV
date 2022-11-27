@@ -55,9 +55,9 @@ if __name__=='__main__':
     
     # cityscape image size
     model.eval()
-    model = model.cuda().half()
+    model = model.half().cuda()
     
-    input_size = torch.randn(input_shapes,dtype=torch.half).cuda()
+    input_size = torch.randn(input_shapes,dtype=torch.half)
 
     print(f'input shape : {input_size.shape} ({input_size.dtype})')
 
@@ -85,6 +85,7 @@ if __name__=='__main__':
 
     # torch -> tensorrt 
     if kargs['trt']:
+        input_size = input_size.cuda()
         if kargs['int8']:
             print(f'\nCreating trt int8 file...')
             trt_model = torch2trt(model,[input_size], max_workspace_size=1<<32,int8_mode=True,use_onnx=True,onnx_opset=kargs['onnx_opset'])
