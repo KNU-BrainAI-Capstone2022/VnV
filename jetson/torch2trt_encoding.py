@@ -42,27 +42,18 @@ if __name__=='__main__':
         exit(1)
     model_trt = TRTModule()
     model_trt.load_state_dict(torch.load(model_path))
-    
-    # model dtype
-    if kargs['dtype']=='int8':
-        model_dtype = torch.qint8
-    else:
-        model_dtype = torch.float32
 
     # --------------------------------------------
     # video info check
     # --------------------------------------------
-    input_video = 'video/'+kargs['video']+'.mp4'
-    if not os.path.exists('./video'):
-        os.mkdir('./video')
-    if not os.path.exists(input_video):
+    if not os.path.exists(kargs['video']):
         print('input video is not exist\n')
         exit(1)
-    cap = cv2.VideoCapture(input_video)
+    cap = cv2.VideoCapture(kargs['video'])
 
-    frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    fps = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)) // 2
+    frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)) // 2
+    fps = int(cap.get(cv2.CAP_PROP_FPS))
     print(f'video ({frame_width},{frame_height}), {fps} fps')
 
     # ----------------------------------------------
@@ -70,8 +61,9 @@ if __name__=='__main__':
     # ----------------------------------------------
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     out_name = 'video/'+kargs['video']+'_'+kargs['dtype']+'_output.mp4'
+    out_name = kargs['video'][:-4]+'_fp16_output.mp4'
     out_cap = cv2.VideoWriter(out_name,fourcc,fps,(frame_width,frame_height))
-    print(f'{input_video} encoding ...')
+    print(f"{kargs['video']} encoding ...")
 
     # ----------------------------------------------
     # video encoding
@@ -83,8 +75,9 @@ if __name__=='__main__':
         if not ret:
             print('cap.read is failed')
             break
+        frame = cv2.resize(frame, (frame_width,frame_height))
         frame = cv2.cvtColor(frame,cv2.COLOR_BGR2RGB)
-        predict = F.to_tensor(frame).unsqueeze(0).to(device, dtype=model_dtype).half()
+        predict = F.to_tensor(frame).unsqueeze(0).to(device).half()
         predict = F.normalize(predict,(0.485,0.456,0.406),(0.229,0.224,0.225))
         
         # model inference
@@ -97,6 +90,8 @@ if __name__=='__main__':
         result = cv2.cvtColor(result, cv2.COLOR_RGB2BGR)
         out_cap.write(result)
         total_frame +=1
+        if total_frame > 200:
+            break
 
     print(f'finish encoding - {out_name}')
     total_time = time.time()-start

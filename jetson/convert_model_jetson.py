@@ -50,15 +50,15 @@ if __name__=='__main__':
     # model = WrappedModel(model)
     
     # Test
-    input_shapes = (1,3,540,960)
+    input_shape = (1,3,540,960)
     # model = TestModel(kargs['num_classes'],input_shapes)
     
     # cityscape image size
     model.eval()
-    model = model.half().cuda()
-    
-    input_size = torch.randn(input_shapes,dtype=torch.half)
+    model = model.cuda()
 
+    input_size = torch.randn(input_shape,dtype=torch.float32)
+    
     print(f'input shape : {input_size.shape} ({input_size.dtype})')
 
     # torch --> onnx
@@ -85,28 +85,18 @@ if __name__=='__main__':
 
     # torch -> tensorrt 
     if kargs['trt']:
-        input_size = input_size.cuda()
         if kargs['int8']:
-            print(f'\nCreating trt int8 file...')
-            trt_model = torch2trt(model,[input_size], max_workspace_size=1<<32,int8_mode=True,use_onnx=True,onnx_opset=kargs['onnx_opset'])
+            mode = 'int8'
+        elif kargs['fp16']:
+            mode = 'fp16'
+        else:
+            mode = 'fp32'
+        mode_kargs = {'int8':{'int8_mode':True},'fp16':{'fp16_mode':True},'fp32':{'int32_mode':True}}
+        input_size = input_size.cuda()
 
-            torch.save(trt_model.state_dict(),f"{output_name}_trt_int8.pth")
-            print(f"\nTRTModule {output_name}_trt_int8.pth is Created")
+        print(f'\nCreating trt {mode} file...')
+        trt_model = torch2trt(model,[input_size], max_workspace_size=1<<32,**mode_kargs[mode])
+        # trt_model = torch2trt(model,[input_size], max_workspace_size=1<<32,fp16_mode=True,use_onnx=True,onnx_opset=kargs['onnx_opset'])
 
-        if kargs['fp16']:
-            print(f'\nCreating trt fp16 file...')
-            trt_model = torch2trt(model,[input_size], max_workspace_size=1<<32,fp16_mode=True,use_onnx=True,onnx_opset=kargs['onnx_opset'])
-
-            torch.save(trt_model.state_dict(),f"{output_name}_trt_fp16.pth")
-            print(f"\nTRTModule {output_name}_trt_fp16.pth is Created")
-        
-        if kargs['fp32']:
-            print(f'\nCreating trt float32 file...')
-            trt_model = torch2trt(model,[input_size], max_workspace_size=1<<32,use_onnx=True, onnx_opset=kargs['onnx_opset'])
-
-            torch.save(trt_model.state_dict(),f"{output_name}_trt_fp32.pth")
-            print(f"\nTRTModule {output_name}_trt_fp32.pth is Created")
-
-
-
-        
+        torch.save(trt_model.state_dict(),f"{output_name}_trt_{mode}.pth")
+        print(f"\nTRTModule {output_name}_trt_{mode}.pth is Created")

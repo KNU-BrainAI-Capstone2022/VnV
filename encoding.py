@@ -51,12 +51,14 @@ if __name__=="__main__":
     kargs=vars(get_args())
 
     print(f"\n'{kargs['model']}' model loading...\n")
-    root_dir = os.path.dirname(os.path.abspath(__file__))
-    ckpt_dir = os.path.join(root_dir,"checkpoint",kargs['model']+'_cityscapes')
-    ckpt=os.path.join(ckpt_dir,'model_best.pth')
-    if not os.path.exists(ckpt):
-        print('model is not exist\n')
-        exit(1)
+    # root_dir = os.path.dirname(os.path.abspath(__file__))
+    # ckpt_dir = os.path.join(root_dir,"checkpoint",kargs['model']+'_cityscapes')
+    # ckpt=os.path.join(ckpt_dir,'model_best.pth')
+    # if not os.path.exists(ckpt):
+    #     print('model is not exist\n')
+    #     exit(1)
+    kargs['model'] = 'deeplabv3plus_mobilenet'
+    ckpt = './checkpoint/deeplabv3plus_mobilenet_new_distill_0.1_0.01_fix_cityscapes/model_best.pth'
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = models.model.__dict__[kargs['model']](num_classes=19,output_stride=16,pretrained_backbone=False).to(device)
@@ -97,6 +99,8 @@ if __name__=="__main__":
     with torch.no_grad():
         start = time.time()
         while True:
+            if total_frame > 30:
+                break
             ret, frame = cap.read()
             if not ret:
                 print('cap.read is failed')
