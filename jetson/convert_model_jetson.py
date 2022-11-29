@@ -95,8 +95,8 @@ if __name__=='__main__':
         input_size = input_size.cuda()
 
         print(f'\nCreating trt {mode} file...')
-        trt_model = torch2trt(model,[input_size], max_workspace_size=1<<32,**mode_kargs[mode])
-        # trt_model = torch2trt(model,[input_size], max_workspace_size=1<<32,fp16_mode=True,use_onnx=True,onnx_opset=kargs['onnx_opset'])
+        # trt_model = torch2trt(model,[input_size], max_workspace_size=1<<32,**mode_kargs[mode])
+        trt_model = torch2trt(model,[input_size], max_workspace_size=1<<32,fp16_mode=True,use_onnx=True,onnx_opset=kargs['onnx_opset'])
 
         torch.save(trt_model.state_dict(),f"{output_name}_trt_{mode}.pth")
         print(f"\nTRTModule {output_name}_trt_{mode}.pth is Created")
