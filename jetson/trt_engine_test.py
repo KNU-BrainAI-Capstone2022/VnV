@@ -293,6 +293,7 @@ if __name__=='__main__':
     print("Model Loading Done.")
     # version print()
     
+    # version print()
     # --------------------------------------------
     # video info check
     # --------------------------------------------
@@ -319,6 +320,7 @@ if __name__=='__main__':
     #     e, l = create_builder.parse_or_load()
     #     exit(1)
     
+    
     if kargs['torch'] or kargs['torch2trt']:
         print("Running Pytorch\n")
         total_frame=0
@@ -330,11 +332,12 @@ if __name__=='__main__':
                 if not ret:
                     print('cap.read is failed')
                     break
+                
                 frame = cv2.resize(frame, (frame_width,frame_height))
                 frame = cv2.cvtColor(frame,cv2.COLOR_BGR2RGB)
                 input_image = F.to_tensor(frame).to(device).unsqueeze(0)
                 #input_image = F.to_tensor(frame).unsqueeze(0)
-                #print("before inference")
+                print(f"total frame : {total_frame}")
                 only_run = time.time()
                 predict = model(input_image)
                 only_infer_time += time.time()-only_run
