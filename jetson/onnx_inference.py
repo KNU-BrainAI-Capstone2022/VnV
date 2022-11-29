@@ -59,21 +59,19 @@ def infer(context, input_img, output_size, batch_size):
 def get_args():
     parser = argparse.ArgumentParser(description="PyTorch Segmentation Video Encoding")
     # model option
-    parser.add_argument("--weights", type=str, default=None,help="model weights path")
+    parser.add_argument('-c', "--checkpoint", type=str, default=None,help="model weights path")
     # Dataset Options
     parser.add_argument("--video", type=str, help="input video name",required=True)
-    parser.add_argument("--pair", action='store_true', help="Generate pair frame")
     parser.add_argument("--test", action='store_true', help="Generate thunbnail")
-    parser.add_argument("--fp16", action='store_true', help="data type fp16")
+    parser.add_argument("--pair", action='store_true', help="Generate pair frame")
     parser.add_argument("--int8", action='store_true', help="data type int8")
+    parser.add_argument("--fp16", action='store_true', help="data type fp16")
     return parser.parse_args()
     
 if __name__=='__main__':
     # model load``
-    kargs=vars(get_args())
-    # fp32
-    # kargs['weights']= "checkpoint/deeplabv3plus_resnet50_cityscapes/model_best.onnx"
-    
+    kargs = vars(get_args())
+
     # fp16
     kargs['weights'] = "test_half.onnx"
     
@@ -100,7 +98,7 @@ if __name__=='__main__':
 
     frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    fps = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    fps = int(cap.get(cv2.CAP_PROP_FPS))
     print(f'video ({frame_width},{frame_height}), {fps} fps')
 
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')

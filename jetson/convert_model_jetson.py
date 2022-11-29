@@ -11,16 +11,20 @@ import argparse
 from models.model import deeplabv3plus_resnet50,deeplabv3plus_mobilenet
 import torch.onnx
 from torch2trt import torch2trt
-from utils_jet.model import WrappedModel, TestModel
 
 if __name__=='__main__':
     parser = argparse.ArgumentParser(description="PyTorch Segmentation Training")
+    parser.add_argument('-c',"--checkpoint", type=str, default='../checkpoint/deeplabv3plus_mobilenet_cityscapes/model_best.pth', help='weight file path')
+    parser.add_argument('-i',"--img_size", nargs='+', type=int, default=[960, 540], help="input image size (width height)")
     parser.add_argument("--num_classes", type=int, default=19, help="num classes (default: 19, cityscapes)")
-    parser.add_argument("--weights", type=str,default='../checkpoint/deeplabv3plus_mobilenet_cityscapes/model_best.pth', help='weight file path')
+    parser.add_argument('-O',"--output", type=str, default=None, help='output model name')
+    
+    # onnx options
     parser.add_argument("--onnx", action='store_true', help='Create onnx fp32')
-    parser.add_argument("--trt", action='store_true', help='Create tensorrt model')
     parser.add_argument("--onnx-opset", type=int, default=13, help='Opset version ai.onnx')
-    parser.add_argument("-O","--output", type=str, default=None)
+    
+    # torch2trt options
+    parser.add_argument("--trt", action='store_true', help='Create tensorrt model')
     parser.add_argument("--int8", action='store_true', help="Create torch2trt int8")
     parser.add_argument("--fp16", action='store_true', help="Create torch2trt fp16")
     parser.add_argument("--fp32", action='store_true', help="Create torch2trt fp32")
@@ -30,42 +34,36 @@ if __name__=='__main__':
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f'device : {device}')
 
-    if 'resnet' in kargs['weights']:
+    if 'resnet50' in kargs['checkpoint']:
         model = deeplabv3plus_resnet50(num_classes=kargs['num_classes'],pretrained_backbone=False)
-    elif 'mobilenet' in kargs['weights']:
+    elif 'mobilenet' in kargs['checkpoint']:
         model = deeplabv3plus_mobilenet(num_classes=kargs['num_classes'], pretrained_backbone=False)
     
     if kargs['output'] is None:
-        output_name = kargs['weights'].replace(".pth","_jetson")
+        output_name = kargs['checkpoint'].replace(".pth","_jetson")
     else:
         output_name = kargs['output']
 
     # load weight
     print(f'Load model....')
-    model_state= torch.load(kargs['weights'])
+    model_state= torch.load(kargs['checkpoint'])
     model.load_state_dict(model_state['model_state'])
-    del model_state
 
-    # wrapping
-    # model = WrappedModel(model)
+    # input image size
+    w,h = kargs['img_size']
+    input_shape = (1,3,h,w)
     
-    # Test
-    input_shape = (1,3,540,960)
-    # model = TestModel(kargs['num_classes'],input_shapes)
-    
-    # cityscape image size
     model.eval()
     model = model.cuda()
 
-    input_size = torch.randn(input_shape,dtype=torch.float32)
+    # input is Cuda Tensor
+    input_size = torch.randn(input_shape,dtype=torch.float32).cuda()
     
     print(f'input shape : {input_size.shape} ({input_size.dtype})')
 
     # torch --> onnx
     if kargs['onnx']:
-
         save_name = output_name + '.onnx'
-
         print(f'\nCreating onnx file...')
         torch.onnx.export(
             model,                      # 모델
@@ -92,7 +90,6 @@ if __name__=='__main__':
         else:
             mode = 'fp32'
         mode_kargs = {'int8':{'int8_mode':True},'fp16':{'fp16_mode':True},'fp32':{'int32_mode':True}}
-        input_size = input_size.cuda()
 
         print(f'\nCreating trt {mode} file...')
         trt_model = torch2trt(model,[input_size], max_workspace_size=1<<32,**mode_kargs[mode])
