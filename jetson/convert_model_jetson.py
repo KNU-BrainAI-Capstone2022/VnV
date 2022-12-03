@@ -19,12 +19,12 @@ if __name__=='__main__':
     parser.add_argument("--num_classes", type=int, default=19, help="num classes (default: 19, cityscapes)")
     parser.add_argument('-O',"--output", type=str, default=None, help='output model name')
     
-    # onnx options
-    parser.add_argument("--onnx", action='store_true', help='Create onnx fp32')
+    # tensorrt engine options
+    parser.add_argument("--trt", action='store_true', help='Create trt fp16 and onnx')
     parser.add_argument("--onnx-opset", type=int, default=13, help='Opset version ai.onnx')
     
     # torch2trt options
-    parser.add_argument("--trt", action='store_true', help='Create tensorrt model')
+    parser.add_argument("--torch2trt", action='store_true', help='Create tensorrt model')
     parser.add_argument("--int8", action='store_true', help="Create torch2trt int8")
     parser.add_argument("--fp16", action='store_true', help="Create torch2trt fp16")
     parser.add_argument("--fp32", action='store_true', help="Create torch2trt fp32")
@@ -62,7 +62,7 @@ if __name__=='__main__':
     print(f'input shape : {input_size.shape} ({input_size.dtype})')
 
     # torch --> onnx
-    if kargs['onnx']:
+    if kargs['trt']:
         save_name = output_name + '.onnx'
         print(f'\nCreating onnx file...')
         torch.onnx.export(
@@ -78,11 +78,13 @@ if __name__=='__main__':
         )
         print(f"{save_name} -> onnx is done")
 
-    # onnx - > tensorrt
-    # /usr/src/tensorrt/bin/trtexec --onnx=model_best_jetson.onnx --saveEngine=model_best_jetson_fp16.engine --fp16 --verbose --buildOnly
+        # onnx - > tensorrt
+        print(f"\n onnx -> tensorrt converting ...")
+        os.system(f"/usr/src/tensorrt/bin/trtexec --onnx={save_name} --saveEngine={output_name}_fp16.engine --fp16 --verbose --buildOnly")
+        # /usr/src/tensorrt/bin/trtexec --onnx=model_best_jetson.onnx --saveEngine=model_best_jetson_fp16.engine --fp16 --verbose --buildOnly
 
     # torch -> tensorrt 
-    if kargs['trt']:
+    if kargs['torch2trt']:
         if kargs['int8']:
             mode = 'int8'
         elif kargs['fp16']:

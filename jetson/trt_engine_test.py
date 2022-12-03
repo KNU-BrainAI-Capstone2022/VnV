@@ -60,7 +60,8 @@ class HostDeviceMem(object):
         return self.__str__()
 
 class TrtModel:
-    def __init__(self,engine_path,dtype=np.float16):
+    def __init__(self,engine_path,dtype=np.float32):
+        print(f"\nTRT Engine init...")
         self.engine_path = engine_path
         self.dtype = dtype
         self.logger = trt.Logger(trt.Logger.WARNING)
@@ -77,8 +78,11 @@ class TrtModel:
         # memory 할당
         self.inputs, self.outputs, self.bindings, self.stream = self.allocate_buffers()
         self.context = self.engine.create_execution_context()
-
-        # print(f"engine.get_location -> {self.engine.get_location(0)}")
+        
+        # print(self.context.get_binding_shape(0))
+        # print(self.context.get_binding_shape(1))
+        print(f"engine.get_location -> {self.engine.get_location(0)}")
+        print(f"engine.get_binding_dtype -> {self.engine.get_binding_dtype}\n")
 
     @staticmethod
     def load_engine(trt_runtime, engine_path):
@@ -89,177 +93,61 @@ class TrtModel:
         return engine
     
     def allocate_buffers(self):
-        
-        inputs = []
-        outputs = []
+
         bindings = []
         stream = cuda.Stream()
-        
+
         for binding in self.engine:
-            size = trt.volume(self.engine.get_binding_shape(binding))
-            host_mem = cuda.pagelocked_empty(size, self.dtype)
-            device_mem = cuda.mem_alloc(host_mem.nbytes)
-            
+            print(f"  {binding}")
+            size = tuple(self.engine.get_binding_shape(binding))
+            print(f"  binding size : {size}")
+            dtype = self.engine.get_binding_dtype(binding)
+            print(f"  binding dtype : {dtype}")
+            location = self.engine.get_location(binding)
+            print(f"  binding location : {location}\n")
+
+            # # np.ndarray의 pagelocked를 할당
+            # host_mem = cuda.pagelocked_empty(size, self.dtype)
+            host_mem = torch.empty(size=size, dtype=torch.float32, device=torch.device("cuda"))
+            # device memory 할당
+            device_mem = host_mem.data_ptr()
             bindings.append(int(device_mem))
 
             if self.engine.binding_is_input(binding):
-                inputs.append(HostDeviceMem(host_mem, device_mem))
-                # print(f"input data host_mem : {host_mem}, device_mem :{device_mem}")
+                inputs = host_mem
             else:
-                outputs.append(HostDeviceMem(host_mem, device_mem))
+                outputs = host_mem
         
         return inputs, outputs, bindings, stream
 
     def __call__(self,x,batch_size=1):
         
         # -------------------------- torch tensor
-        # x = x.half().contiguous()
+        # x = x.contiguous()
         # self.inputs[0].host = x.ravel()
 
         # --------------------------- numpy
-        x = x.astype(self.dtype)
-        x = np.ascontiguousarray(x)
+        # x = x.astype(self.dtype).ravel()
+        # x = np.ascontiguousarray(x)
         
         # # x.ravel is Returns to a continuous 1-dimensional plane
-        np.copyto(self.inputs[0].host,x.ravel())
+        # np.copyto(self.inputs[0].host,x.ravel())
         # ----------------------------------------------
-
-        [cuda.memcpy_htod_async(inp.device, inp.host, self.stream) for inp in self.inputs]
+        self.bindings[0] = x.contiguous().data_ptr()
+        # [cuda.memcpy_htod_async(inp.device, inp.host, self.stream) for inp in self.inputs]
         # infer time check
         only_run = time.time()
         check = self.context.execute_async_v2(bindings=self.bindings, stream_handle=self.stream.handle)
         i_time = time.time()-only_run
 
-        [cuda.memcpy_dtoh_async(out.host, out.device, self.stream) for out in self.outputs]
-
+        # [cuda.memcpy_dtoh_async(out.host, out.device, self.stream) for out in self.outputs]
         self.stream.synchronize()
 
-        return [out.host.reshape(batch_size,-1) for out in self.outputs], i_time
+        return self.outputs , i_time
 
     def __del__(self):
         if self.engine is not None:
             del self.engine
-
-class Load_engine:
-    def __init__(
-            self,
-            max_batch_size=1,
-            onnx_path=None,
-            maxworkspace = 25,
-            precision_str= "FP16",
-            precision=None,
-            allowGPUFallback=None,
-            dla_core=None,
-            device=None,
-            calibrator=None,
-            engine_path = None
-            ):
-
-        self.max_batch_size = max_batch_size
-        self.onnx_path = onnx_path
-        self.maxworkspace = maxworkspace
-        self.precision_str = precision_str
-        self.precision = precision
-        self.allowGPUFallback = allowGPUFallback
-        self.dla_core = dla_core
-        self.device = device
-        self.calibrator = calibrator
-        if engine_path == None:
-            self.engine_path = onnx_path.replace(".onnx", ".engine")
-        else:
-            self.engine_path = engine_path
-
-
-    def parse_or_load(self):
-        logger = trt.Logger(trt.Logger.INFO)
-
-        with trt.Builder(logger) as builder:
-            builder.max_batch_size=self.max_batch_size
-            #setting max_batch_size isn't strictly necessary in this case
-            #since the onnx file already has that info, but its a good practice
-            
-            network_flag = 1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH)
-            
-            #since the onnx file was exported with an explicit batch dim,
-            #we need to tell this to the builder. We do that with EXPLICIT_BATCH flag
-            
-            with builder.create_network(network_flag) as net:
-                with trt.OnnxParser(net, logger) as p:
-                    #create onnx parser which will read onnx file and
-                    #populate the network object `net`          
-                    with open(self.onnx_path, 'rb') as f:
-                        if not p.parse(f.read()):
-                            for err in range(p.num_errors):
-                                print(p.get_error(err))
-                        else:
-                            logger.log(trt.Logger.INFO, 'Onnx file parsed successfully')
-        
-                    net.get_input(0).dtype=trt.DataType.HALF
-                    net.get_output(0).dtype=trt.DataType.HALF
-                    #we set the inputs and outputs to be float16 type to enable
-                    #maximum fp16 acceleration. Also helps for int8
-                    
-                    config=builder.create_builder_config()
-                    #we specify all the important parameters like precision, 
-                    #device type, fallback in config object
-        
-                    config.max_workspace_size = self.maxworkspace
-        
-                    if self.precision_str in ['FP16', 'INT8']:
-                        config.flags = ((1<<self.precision)|(1<<self.allowGPUFallback))
-                        config.DLA_core=self.dla_core
-                    # DLA core (0 or 1 for Jetson AGX/NX/Orin) to be used must be 
-                    # specified at engine build time. An engine built for DLA0 will 
-                    # not work on DLA1. As such, to use two DLA engines simultaneously, 
-                    # we must build two different engines.
-        
-                    config.default_device_type=self.device
-                    #if device is set to GPU, DLA_core has no effect
-        
-                    config.profiling_verbosity = trt.ProfilingVerbosity.VERBOSE
-                    #building with verbose profiling helps debug the engine if there are
-                    #errors in inference output. Does not impact throughput.
-        
-                    if self.precision_str=='INT8' and self.calibrator is None:
-                        logger.log(trt.Logger.ERROR, 'Please provide calibrator')
-                        #can't proceed without a calibrator
-                        quit()
-                    elif self.precision_str=='INT8' and self.calibrator is not None:
-                        config.int8_calibrator=self.calibrator
-                        logger.log(trt.Logger.INFO, 'Using INT8 calibrator provided by user')
-        
-                    logger.log(trt.Logger.INFO, 'Checking if network is supported...')
-                    
-                    if builder.is_network_supported(net, config):
-                        logger.log(trt.Logger.INFO, 'Network is supported')
-                    #tensorRT engine can be built only if all ops in network are supported.
-                    #If ops are not supported, build will fail. In this case, consider using 
-                    #torch-tensorrt integration. We might do a blog post on this in the future.
-                    else:
-                        logger.log(trt.Logger.ERROR, 'Network contains operations that are not supported by TensorRT')
-                        logger.log(trt.Logger.ERROR, 'QUITTING because network is not supported')
-                        quit()
-        
-                    if self.device==trt.DeviceType.DLA:
-                        dla_supported=0
-                        logger.log(trt.Logger.INFO, 'Number of layers in network: {}'.format(net.num_layers))
-                        for idx in range(net.num_layers):
-                            if config.can_run_on_DLA(net.get_layer(idx)):
-                                dla_supported+=1
-        
-                        logger.log(trt.Logger.INFO, f'{dla_supported} of {net.num_layers} layers are supported on DLA')
-        
-                    logger.log(trt.Logger.INFO, 'Building inference engine...')
-                    engine=builder.build_engine(net, config)
-                    #this will take some time
-        
-                    logger.log(trt.Logger.INFO, 'Inference engine built successfully')
-        
-                    with open(self.enginepath, 'wb') as s:
-                        s.write(engine.serialize())
-                    logger.log(trt.Logger.INFO, f'Inference engine saved to {self.enginepath}')
-                
-        return engine, logger
 
 def lib_version():
     # os.environ['CUDA_LAUNCH_BLOCKING']='1'
@@ -352,8 +240,8 @@ if __name__=='__main__':
                 out_cap.write(result)
                 total_frame +=1
     else:
-        print("TRT Engine running...\n")
         model = TrtModel(engine_path)
+        print("TRT Engine running...\n")
         start = time.time()
         total_frame =0
         only_infer_time = 0
@@ -367,17 +255,18 @@ if __name__=='__main__':
             frame = cv2.resize(frame,(frame_width,frame_height))
             frame = cv2.cvtColor(frame,cv2.COLOR_BGR2RGB)
 
-            input_image = preprocess(frame)
-            # input_image = F.to_tensor(frame)
+            # input_image = preprocess(frame)
+            input_image = F.to_tensor(frame).cuda()
 
             outputs,t = model(input_image)
+
             only_infer_time +=t
 
-            # img = torch.argmax(torch.from_numpy(outputs[0]).view((19,frame_height,frame_width)),dim=0)
-            # img = np.array(mask_colorize(img,cmap))
-
-            img = np.argmax(np.reshape(outputs[0],(19,frame_height,frame_width)),axis=0)
+            img = outputs.detach().squeeze(0).argmax(dim=0).cpu().numpy()
             img = mask_colorize(img,cmap).astype(np.uint8)
+
+            # img = np.argmax(np.reshape(outputs[0],(19,frame_height,frame_width)),axis=0)
+            # img = mask_colorize(img,cmap).astype(np.uint8)
             img = cv2.addWeighted(frame,0.3,img,0.7,0)
             img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
             
@@ -385,6 +274,7 @@ if __name__=='__main__':
             # cv2.imwrite('../video/test.jpg',img)
 
 
+        del(model)
     print(f'finish encoding - {out_name}')
     total_time = time.time()-start
     print(f'total frame = {total_frame} \ntotal time = {total_time:.2f}s')
