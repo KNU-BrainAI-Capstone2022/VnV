@@ -11,17 +11,17 @@ import torchvision.transforms.functional as F
 from utils.Dataset import CustomCityscapesSegmentation
 from models.model import deeplabv3plus_mobilenet
 from torch2trt import TRTModule
-# import onnx
-# import onnxruntime
+import onnx
+import onnxruntime
 
-# try:
-#     import tensorrt as trt
-#     import pycuda.autoinit
-#     import pycuda.driver as cuda
+try:
+    import tensorrt as trt
+    import pycuda.autoinit
+    import pycuda.driver as cuda
 
-# except ImportError:
-#     print("Failed to load tensorrt, pycuda")
-#     exit(1)
+except ImportError:
+    print("Failed to load tensorrt, pycuda")
+    exit(1)
 
 def get_args():
     parser = argparse.ArgumentParser(description="PyTorch Segmentation Video Encoding")
@@ -369,10 +369,10 @@ if __name__=='__main__':
 
             input_image = preprocess(frame)
             # input_image = F.to_tensor(frame)
+
             outputs,t = model(input_image)
-            # print(len(output[0]))
-            
             only_infer_time +=t
+
             # img = torch.argmax(torch.from_numpy(outputs[0]).view((19,frame_height,frame_width)),dim=0)
             # img = np.array(mask_colorize(img,cmap))
 
