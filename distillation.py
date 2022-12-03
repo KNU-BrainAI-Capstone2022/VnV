@@ -111,12 +111,14 @@ def main():
     teacher = models.model.__dict__[kargs['teacher']](num_classes=kargs['num_classes'],output_stride=kargs['output_stride'])
     student = models.model.__dict__[kargs['student']](num_classes=kargs['num_classes'],output_stride=kargs['output_stride'],pretrained_backbone=False)
     
-    print(teacher._modules['classifier'])
-    print(student._modules['classifier'])
+    print(teacher)
+    print(student)
+    # print(teacher._modules['classifier'])
+    # print(student._modules['classifier'])
     # student.load_state_dict()
     # teacher._modules['classifier'].state_dict()
-    teacher.to(device)
-    student.to(device)
+    # teacher.to(device)
+    # student.to(device)
         
     # Optimizer
     # optimizer = torch.optim.SGD(params=student.parameters(), lr=kargs['lr'], momentum=0.9, weight_decay=kargs['weight_decay'])
