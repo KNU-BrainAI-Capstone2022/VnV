@@ -28,7 +28,7 @@ def get_args():
     # model option
     parser.add_argument("--engine", type=str, default="../checkpoint/deeplabv3plus_mobilenet_cityscapes/model_best_jetson_fp16.engine",help="model engine path")
     parser.add_argument("--onnx", type=str, default="../checkpoint/deeplabv3plus_mobilenet_cityscapes/model_best_jetson.onnx", help="model onnx path")
-    parser.add_argument("--base", type=str, default="../checkpoint/deeplabv3plus_mobilenet_new_distill_0.1_0.01_fix_cityscapes/model_best.pth", help="Base model torch (.pth)")
+    parser.add_argument("--base", type=str, default="../checkpoint/deeplabv3plus_mobilenet_cityscapes/model_best.pth", help="Base model torch (.pth)")
     parser.add_argument("--dtype", type=str, choices=['fp32','fp16','int8'], default='fp16',help="weight dtype")
     # Dataset Options
     parser.add_argument("--video", type=str, default="../video/220619_2.mp4",help="input video name")
@@ -327,7 +327,7 @@ if __name__=='__main__':
         only_infer_time = 0
         with torch.no_grad():
             start = time.time()
-            while total_frame < 30:
+            while True:
                 ret, frame = cap.read()
                 if not ret:
                     print('cap.read is failed')
@@ -336,8 +336,8 @@ if __name__=='__main__':
                 frame = cv2.resize(frame, (frame_width,frame_height))
                 frame = cv2.cvtColor(frame,cv2.COLOR_BGR2RGB)
                 input_image = F.to_tensor(frame).to(device).unsqueeze(0)
-                #input_image = F.to_tensor(frame).unsqueeze(0)
-                print(f"total frame : {total_frame}")
+                # input_image = F.to_tensor(frame).unsqueeze(0)
+                # print(f"total frame : {total_frame}")
                 only_run = time.time()
                 predict = model(input_image)
                 only_infer_time += time.time()-only_run
