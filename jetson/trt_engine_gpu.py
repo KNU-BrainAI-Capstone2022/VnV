@@ -186,6 +186,7 @@ if __name__=='__main__':
     # --------------------------------------------
     # file check
     # --------------------------------------------
+    model_path = kargs["checkpoint"]
     if os.path.exists(model_path):
         if kargs['torch']:
             if kargs["wrapped"]:
