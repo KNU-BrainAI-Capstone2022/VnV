@@ -1,0 +1,80 @@
+
+./checkpoint/mobilenet_plain_trtexec.engine engine loading ...
+
+TRT Engine init...
+  inputs
+  binding size : (1, 3, 540, 960)
+  binding dtype : DataType.FLOAT
+  binding location : TensorLocation.DEVICE
+
+  outputs
+  binding size : (1, 19, 540, 960)
+  binding dtype : DataType.FLOAT
+  binding location : TensorLocation.DEVICE
+
+engine.get_location -> TensorLocation.DEVICE
+engine.get_binding_dtype -> <bound method PyCapsule.get_binding_dtype of <tensorrt.tensorrt.ICudaEngine object at 0x7f0a626ea0>>
+
+Model Loading Done.
+video (960,540), 29 fps
+../video/220619_2.mp4 encoding ...
+TRT Engine running...
+
+finish encoding - ../video/220619_2_output.mp4
+total frame = 30 
+total time = 21.82s
+average time = 0.73s
+Only inference time : 1.37s
+./checkpoint/mobilenet_plain_trtexec.engine engine loading ...
+
+TRT Engine init...
+  inputs
+  binding size : (1, 3, 540, 960)
+  binding dtype : DataType.FLOAT
+  binding location : TensorLocation.DEVICE
+
+  outputs
+  binding size : (1, 19, 540, 960)
+  binding dtype : DataType.FLOAT
+  binding location : TensorLocation.DEVICE
+
+engine.get_location -> TensorLocation.DEVICE
+engine.get_binding_dtype -> <bound method PyCapsule.get_binding_dtype of <tensorrt.tensorrt.ICudaEngine object at 0x7f0aefbe30>>
+
+Model Loading Done.
+video (960,540), 29 fps
+../video/220619_2.mp4 encoding ...
+TRT Engine running...
+
+finish encoding - ../video/220619_2_output.mp4
+total frame = 30 
+total time = 21.04s
+average time = 0.70s
+Only inference time : 1.39s
+./checkpoint/mobilenet_plain_onnxparser.engine engine loading ...
+
+TRT Engine init...
+  inputs
+  binding size : (1, 3, 540, 960)
+  binding dtype : DataType.FLOAT
+  binding location : TensorLocation.DEVICE
+
+  outputs
+  binding size : (1, 19, 540, 960)
+  binding dtype : DataType.FLOAT
+  binding location : TensorLocation.DEVICE
+
+engine.get_location -> TensorLocation.DEVICE
+engine.get_binding_dtype -> <bound method PyCapsule.get_binding_dtype of <tensorrt.tensorrt.ICudaEngine object at 0x7f1ad36ea0>>
+
+Model Loading Done.
+video (960,540), 29 fps
+../video/220619_2.mp4 encoding ...
+TRT Engine running...
+
+finish encoding - ../video/220619_2_output.mp4
+total frame = 30 
+total time = 20.95s
+average time = 0.70s
+Only inference time : 1.37s
+

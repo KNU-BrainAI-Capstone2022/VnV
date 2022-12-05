@@ -11,8 +11,8 @@ import torchvision.transforms.functional as F
 from utils.Dataset import CustomCityscapesSegmentation
 from models.model import deeplabv3plus_mobilenet
 from torch2trt import TRTModule
-import onnx
-import onnxruntime
+#import onnx
+#import onnxruntime
 
 try:
     import tensorrt as trt
@@ -25,18 +25,28 @@ except ImportError:
 
 def get_args():
     parser = argparse.ArgumentParser(description="PyTorch Segmentation Video Encoding")
-    # model option
-    parser.add_argument("--engine", type=str, default="../checkpoint/deeplabv3plus_mobilenet_cityscapes/model_best_jetson_fp16.engine",help="model engine path")
-    parser.add_argument("--onnx", type=str, default="../checkpoint/deeplabv3plus_mobilenet_cityscapes/model_best_jetson.onnx", help="model onnx path")
-    parser.add_argument("--base", type=str, default="../checkpoint/deeplabv3plus_mobilenet_cityscapes/model_best.pth", help="Base model torch (.pth)")
-    parser.add_argument("--dtype", type=str, choices=['fp32','fp16','int8'], default='fp16',help="weight dtype")
+    # model checkpoint option
+    parser.add_argument("-c","--checkpoint", type=str, default="./checkpoint/mobilenet_plain.pth", help="model checkpoint path")
+    
+    # wrapped model
+    parser.add_argument("--wrapped", action="store_true", help="wrapped model")
+
     # Dataset Options
     parser.add_argument("--video", type=str, default="../video/220619_2.mp4",help="input video name")
-    parser.add_argument("--torch", action='store_true', help="Using torch deeplabv3+_mobilenet model for inference")
-    parser.add_argument("--test", action="store_true", help="testing create builder")
+
+    # torch2trt option
     parser.add_argument("--torch2trt", action="store_true", help="Using torch2trt module")
+    parser.add_argument("--dtype", type=str, choices=['fp32','fp16','int8'], default='fp16',help="weight dtype")
+
+    # torch option
+    parser.add_argument("--torch", action='store_true', help="Using torch deeplabv3+_mobilenet model for inference")
+    
+    # tensorrt option
+    parser.add_argument("--trt", action="store_true", help="Using tensorrt engine")
+
     return parser.parse_args()
 
+    
 def load_engine(engine_file_path):
     assert os.path.exists(engine_file_path)
     print("Reading engine from file {}".format(engine_file_path))
@@ -105,45 +115,38 @@ class TrtModel:
             print(f"  binding dtype : {dtype}")
             location = self.engine.get_location(binding)
             print(f"  binding location : {location}\n")
-
+            # ---- for cpu input ----
             # # np.ndarray의 pagelocked를 할당
-            # host_mem = cuda.pagelocked_empty(size, self.dtype)
-            host_mem = torch.empty(size=size, dtype=torch.float32, device=torch.device("cuda"))
+            host_mem = cuda.pagelocked_empty(size, self.dtype)
             # device memory 할당
-            device_mem = host_mem.data_ptr()
-            bindings.append(int(device_mem))
+            device_mem = cuda.mem_alloc(host_mem.nbytes)
 
             if self.engine.binding_is_input(binding):
-                inputs = host_mem
+                inputs = HostDeviceMem(host_mem, device_mem)
             else:
-                outputs = host_mem
+                outputs = HostDeviceMem(host_mem, device_mem)
         
+            bindings.append(int(device_mem))
+
         return inputs, outputs, bindings, stream
 
-    def __call__(self,x,batch_size=1):
-        
-        # -------------------------- torch tensor
-        # x = x.contiguous()
-        # self.inputs[0].host = x.ravel()
+    def __call__(self,inputs,batch_size=1):
 
         # --------------------------- numpy
-        # x = x.astype(self.dtype).ravel()
-        # x = np.ascontiguousarray(x)
-        
-        # # x.ravel is Returns to a continuous 1-dimensional plane
-        # np.copyto(self.inputs[0].host,x.ravel())
-        # ----------------------------------------------
-        self.bindings[0] = x.contiguous().data_ptr()
-        # [cuda.memcpy_htod_async(inp.device, inp.host, self.stream) for inp in self.inputs]
+        x = inputs.astype(self.dtype)
+        x = np.ascontiguousarray(x)
+        # np.copyto(self.inputs.host,x)
+
+        cuda.memcpy_htod_async(self.inputs.device, x, self.stream)
         # infer time check
         only_run = time.time()
         check = self.context.execute_async_v2(bindings=self.bindings, stream_handle=self.stream.handle)
         i_time = time.time()-only_run
 
-        # [cuda.memcpy_dtoh_async(out.host, out.device, self.stream) for out in self.outputs]
+        cuda.memcpy_dtoh_async(self.outputs.host, self.outputs.device, self.stream)
         self.stream.synchronize()
 
-        return self.outputs , i_time
+        return self.outputs.host , i_time
 
     def __del__(self):
         if self.engine is not None:
@@ -156,32 +159,57 @@ def lib_version():
     print(f"onnx verison : {onnx.__version__}")
     print(f"onnxruntime version : {onnxruntime.__version__}")
 
-
 if __name__=='__main__':
     kargs = vars(get_args())
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    # lib_version()
-    if kargs['torch']:
-        model = deeplabv3plus_mobilenet(num_classes=19,output_stride=16,pretrained_backbone=False).to(device)
-        model_path = kargs['base']
-        print(f"{model_path} model loading ...")
-        model.load_state_dict(torch.load(model_path)['model_state'])
-        model.eval()
-    elif kargs['torch2trt']:
-        model = TRTModule()
-        model_path = kargs['base'].replace(".pth","_jetson_trt_fp16.pth")
-        print(f"{model_path} model loading ....")
-        model.load_state_dict(torch.load(model_path))
+    model_path = kargs['checkpoint']
+
+    # version check
+    # lib_version() 
+    if os.path.exists(model_path):
+        if kargs['torch']:
+            if kargs["wrapped"]:
+                from wrapmodel import WrappedModel
+                model = WrappedModel(model).to(device)
+            else:
+                model = deeplabv3plus_mobilenet(num_classes=19,output_stride=16,pretrained_backbone=False).to(device)
+            # check torch model
+            if '.pth' in model_path:
+                print(f"{model_path} model loading ...")
+                model.load_state_dict(torch.load(model_path)['model_state'])
+                model.eval()
+            else:
+                print(f"{model_path} is not torch checkpoint")
+                exit(1)
+
+        elif kargs['torch2trt']:
+            # check torch2trt model
+            if "torch2trt" in model_path:
+                print(f"{model_path} model loading ....")
+                model = TRTModule()
+                model.load_state_dict(torch.load(model_path))
+            else:
+                print(f"{model_path} is not torch2trt model")
+                exit(1)
+
+        elif kargs['trt']:
+            if ".engine" in model_path:
+                TRT_LOGGER = trt.Logger()
+                print(f"{model_path} engine loading ...")
+                model = TrtModel(model_path)
+            else:
+                print(f"{model_path} is not tensorrt engine")
+                exit(1)
+        else:
+            print("select option")
     else:
-        TRT_LOGGER = trt.Logger()
-        engine_path = kargs['engine']
-        print(f"{engine_path} engine loading ...")
+        print(f"{model_path} is not exist")
+        exit(1)
+
     # cmap load
     cmap = CustomCityscapesSegmentation.cmap
     print("Model Loading Done.")
-    # version print()
-    
-    # version print()
+
     # --------------------------------------------
     # video info check
     # --------------------------------------------
@@ -202,12 +230,6 @@ if __name__=='__main__':
     out_name = kargs['video'][:-4]+'_output.mp4'
     out_cap = cv2.VideoWriter(out_name,fourcc,fps,(frame_width,frame_height))
     print(f"{kargs['video']} encoding ...")
-
-    # if kargs['test']:
-    #     create_builder = Load_engine(onnx_path=kargs['onnx'])
-    #     e, l = create_builder.parse_or_load()
-    #     exit(1)
-    
     
     if kargs['torch'] or kargs['torch2trt']:
         print("Running Pytorch\n")
@@ -215,32 +237,33 @@ if __name__=='__main__':
         only_infer_time = 0
         with torch.no_grad():
             start = time.time()
-            while True:
+            while total_frame < 30:
                 ret, frame = cap.read()
                 if not ret:
                     print('cap.read is failed')
                     break
+                total_frame +=1
+                origin = cv2.resize(frame, (frame_width,frame_height))
+                frame = origin.copy()
                 
-                frame = cv2.resize(frame, (frame_width,frame_height))
-                frame = cv2.cvtColor(frame,cv2.COLOR_BGR2RGB)
-                input_image = F.to_tensor(frame).to(device).unsqueeze(0)
-                # input_image = F.to_tensor(frame).unsqueeze(0)
-                # print(f"total frame : {total_frame}")
+                if not kargs["wrapped"]:
+                    frame = cv2.cvtColor(frame,cv2.COLOR_BGR2RGB)
+                    frame = F.to_tensor(frame).unsqueeze(0).cuda()
+
                 only_run = time.time()
-                predict = model(input_image)
+                predict = model(frame)
                 only_infer_time += time.time()-only_run
                 
                 #print(predict.shape)
-                predict = predict.detach().squeeze(0).argmax(dim=0).cpu().numpy()
-                predict = mask_colorize(predict,cmap).astype(np.uint8)
+                #predict = predict.detach().squeeze(0).argmax(dim=0).cpu().numpy()
+                #predict = mask_colorize(predict,cmap).astype(np.uint8)
                 
-                result = cv2.addWeighted(frame,0.3,predict,0.7,0)
-                result = cv2.cvtColor(result, cv2.COLOR_RGB2BGR)
+                #predict = cv2.cvtColor(predict, cv2.COLOR_RGB2BGR)
+                #predict = cv2.addWeighted(predict,0.3,origin,0.7,0)
                 
-                out_cap.write(result)
-                total_frame +=1
-    else:
-        model = TrtModel(engine_path)
+                #out_cap.write(predict)
+    
+    elif kargs['trt']:
         print("TRT Engine running...\n")
         start = time.time()
         total_frame =0
@@ -252,27 +275,25 @@ if __name__=='__main__':
                 print('cap.read is failed')
                 break
             total_frame +=1
-            frame = cv2.resize(frame,(frame_width,frame_height))
-            frame = cv2.cvtColor(frame,cv2.COLOR_BGR2RGB)
+            origin = cv2.resize(frame,(frame_width,frame_height))
+            frame = origin.copy()
+            
+            if not kargs["wrapped"]:
 
-            # input_image = preprocess(frame)
-            input_image = F.to_tensor(frame).cuda()
+                frame = cv2.cvtColor(frame,cv2.COLOR_BGR2RGB)
 
-            outputs,t = model(input_image)
+                frame = preprocess(frame)
+
+            outputs,t = model(frame)
 
             only_infer_time +=t
 
-            img = outputs.detach().squeeze(0).argmax(dim=0).cpu().numpy()
+            img = np.argmax(np.reshape(outputs,(19,frame_height,frame_width)),axis=0)
             img = mask_colorize(img,cmap).astype(np.uint8)
-
-            # img = np.argmax(np.reshape(outputs[0],(19,frame_height,frame_width)),axis=0)
-            # img = mask_colorize(img,cmap).astype(np.uint8)
-            img = cv2.addWeighted(frame,0.3,img,0.7,0)
             img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+            img = cv2.addWeighted(origin,0.3,img,0.7,0)
             
             out_cap.write(img)
-            # cv2.imwrite('../video/test.jpg',img)
-
 
         del(model)
     print(f'finish encoding - {out_name}')
