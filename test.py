@@ -32,10 +32,14 @@ def get_args():
     
     args.test = True
     if args.checkpoint:
-        args.modelname = args.checkpoint.split('/')[-2]
-        ckptname = args.modelname.split('_')
-        args.model =  '_'.join(ckptname[0:2])
-        args.dataset = ckptname[-1]
+        if args.checkpoint == 'deeplabv3_mobilenetv3':
+            args.model =  'deeplabv3_mobilenetv3'
+            args.dataset = 'cityscapes'
+        else:
+            args.modelname = args.checkpoint.split('/')[-2]
+            ckptname = args.modelname.split('_')
+            args.model =  '_'.join(ckptname[0:2])
+            args.dataset = ckptname[-1]
     else:
         args.dataset = 'cityscapes'
     
@@ -120,13 +124,16 @@ def main():
         model = TRTModule()
         model.load_state_dict(torch.load(kargs['tr_path']))
     else:
-        model = models.model.__dict__[kargs['model']](num_classes=kargs['num_classes']).to(device)
-        # Load Checkpoint
-        dict_model = torch.load(kargs['checkpoint'])
-        model.load_state_dict(dict_model['model_state'])
-        cur_iter = dict_model['cur_iter']
-        best_score = dict_model['best_score']
-        print(cur_iter,best_score)
+        if kargs['checkpoint'] == 'deeplabv3_mobilenetv3':
+            model = models.model.__dict__[kargs['checkpoint']](num_classes=kargs['num_classes']).to(device)
+        else:
+            model = models.model.__dict__[kargs['model']](num_classes=kargs['num_classes']).to(device)
+            # Load Checkpoint
+            dict_model = torch.load(kargs['checkpoint'])
+            model.load_state_dict(dict_model['model_state'])
+            cur_iter = dict_model['cur_iter']
+            best_score = dict_model['best_score']
+            print(cur_iter,best_score)
     # Loss
     criterion = torch.nn.CrossEntropyLoss(ignore_index=255)
     

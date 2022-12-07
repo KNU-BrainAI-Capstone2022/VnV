@@ -9,8 +9,9 @@ import time
 import torch
 import torchvision.transforms.functional as F
 from utils.Dataset import CustomCityscapesSegmentation
-from models.model import deeplabv3plus_mobilenet
+from models.model import deeplabv3plus_mobilenet,deeplabv3_mobilenetv3
 from torch2trt import TRTModule
+from PIL import Image
 #import onnx
 #import onnxruntime
 
@@ -169,19 +170,22 @@ if __name__=='__main__':
     # lib_version() 
     if os.path.exists(model_path):
         if kargs['torch']:
+            model = deeplabv3_mobilenetv3(num_classes=21,output_stride=16,pretrained_backbone=False).to(device)
             if kargs["wrapped"]:
-                from wrapmodel import WrappedModel
-                model = WrappedModel(model).to(device)
-            else:
-                model = deeplabv3plus_mobilenet(num_classes=19,output_stride=16,pretrained_backbone=False).to(device)
-            # check torch model
-            if '.pth' in model_path:
-                print(f"{model_path} model loading ...")
-                model.load_state_dict(torch.load(model_path)['model_state'])
-                model.eval()
-            else:
-                print(f"{model_path} is not torch checkpoint")
-                exit(1)
+                    from wrapmodel import WrappedModel
+                    model = WrappedModel(model).to(device)
+            # model = deeplabv3plus_mobilenet(num_classes=19,output_stride=16,pretrained_backbone=False).to(device)
+            # # check torch model
+            # if '.pth' in model_path:
+            #     print(f"{model_path} model loading ...")
+            #     model.load_state_dict(torch.load(model_path)['model_state'])
+            #     if kargs["wrapped"]:
+            #         from wrapmodel import WrappedModel
+            #         model = WrappedModel(model).to(device)
+            #     model.eval()
+            # else:
+            #     print(f"{model_path} is not torch checkpoint")
+            #     exit(1)
 
         elif kargs['torch2trt']:
             # check torch2trt model
@@ -208,7 +212,10 @@ if __name__=='__main__':
         exit(1)
 
     # cmap load
-    cmap = CustomCityscapesSegmentation.cmap
+    # cmap = CustomCityscapesSegmentation.cmap
+    palette = torch.tensor([2 ** 25 - 1, 2 ** 15 - 1, 2 ** 21 - 1])
+    cmap = torch.as_tensor([i for i in range(21)])[:, None] * palette
+    cmap = (cmap % 255).numpy().astype("uint8")
     print("Model Loading Done.")
 
     # --------------------------------------------
