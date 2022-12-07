@@ -14,4 +14,5 @@ class WrappedModel(nn.Module):
         x = x.permute(0,3,1,2)
         x = x / 255.0
         x = self.model(x)
+        x = nn.functional.softmax(x,dim=1)
         return x

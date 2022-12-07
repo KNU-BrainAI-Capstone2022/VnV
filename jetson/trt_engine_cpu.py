@@ -118,14 +118,19 @@ class TrtModel:
             location = self.engine.get_location(binding)
             print(f"  binding location : {location}\n")
             # ---- for cpu input ----
-            # # np.ndarray의 pagelocked를 할당
-            host_mem = cuda.pagelocked_empty(size, self.dtype)
-            # device memory 할당
-            device_mem = cuda.mem_alloc(host_mem.nbytes)
-
             if self.engine.binding_is_input(binding):
+                # # np.ndarray의 pagelocked를 할당
+                host_mem = cuda.pagelocked_empty(size, self.dtype)
+                # device memory 할당
+                device_mem = cuda.mem_alloc(host_mem.nbytes)
+
                 inputs = HostDeviceMem(host_mem, device_mem)
             else:
+                # # np.ndarray의 pagelocked를 할당
+                host_mem = cuda.pagelocked_empty(size, np.int32)
+                # device memory 할당
+                device_mem = cuda.mem_alloc(host_mem.nbytes)
+
                 outputs = HostDeviceMem(host_mem, device_mem)
         
             bindings.append(int(device_mem))
@@ -238,7 +243,7 @@ if __name__=='__main__':
     cap.set(cv2.CAP_PROP_FRAME_WIDTH,frame_width)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT,frame_height)
     fps = int(cap.get(cv2.CAP_PROP_FPS))
-    cap.set(cv2.CAP_PROP_FPS,30)
+    cap.set(cv2.CAP_PROP_FPS,5)
     print(f'video ({frame_width},{frame_height}), {fps} fps')
 
     # ----------------------------------------------
@@ -301,15 +306,15 @@ if __name__=='__main__':
                 frame = preprocess(frame)
 
             outputs,t = model(frame)
-
+            print(f"output -> {outputs.shape},{outputs.dtype}")
             only_infer_time +=t
-            
-            img = np.argmax(outputs.squeeze(0),axis=0)
+            print(Counter(outputs.flatten()))
+            #img = np.argmax(outputs.squeeze(0),axis=0)
             
             #print(outputs.shape)
             #print(Counter(outputs.flatten()))
             #img = np.reshape(outputs,(frame_height,frame_width))
-            img = mask_colorize(img,cmap).astype(np.uint8)
+            img = mask_colorize(outputs[0][0],cmap).astype(np.uint8)
             img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
             img = cv2.addWeighted(img,0.3,org_frame,0.7,0)
             
