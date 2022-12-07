@@ -5,7 +5,7 @@ import tensorrt as trt
 import pycuda
 import numpy as np
 import onnxruntime
-file_name = '../checkpoint/deeplabv3plus_mobilenet_cityscapes/model_best_jetson.onnx'
+file_name = './checkpoint/mobilenet_plain.onnx'
 model = onnx.load(file_name)
 
 onnx.checker.check_model(model,full_check=True)
@@ -18,16 +18,3 @@ print(f"tensorrt.__version__ = {trt.__version__}")
 print(f"pycuda.VERSION = {pycuda.VERSION}")
 print(f"numpy.__version__ = {np.__version__}")
 
-# onnx check
-graph = gs.import_onnx(model)
-
-for node in graph.nodes:
-    if 'Pad' in node.name:
-        print(node)
-
-# trt check
-with trt.Logger() as logger, trt.Runtime(logger) as runtime:
-    print(f"logger = {logger}")
-    print(f"runtime = {runtime}")
-    context = engine.create_execution_context()
-    print(context)

@@ -10,18 +10,6 @@ import torch
 import torchvision.transforms.functional as F
 from utils.Dataset import CustomCityscapesSegmentation
 from models.model import deeplabv3plus_mobilenet
-from torch2trt import TRTModule
-import onnx
-import onnxruntime
-
-try:
-    import tensorrt as trt
-    import pycuda.autoinit
-    import pycuda.driver as cuda
-
-except ImportError:
-    print("Failed to load tensorrt, pycuda")
-    exit(1)
 
 def get_args():
     parser = argparse.ArgumentParser(description="PyTorch Segmentation Video Encoding")
@@ -33,6 +21,7 @@ def get_args():
 
     # Dataset Options
     parser.add_argument("--video", type=str, default="../video/220619_2.mp4",help="input video name")
+    parser.add_argument("--cam", action='store_true', help="input video name")
 
     # torch2trt option
     parser.add_argument("--torch2trt", action="store_true", help="Using torch2trt module")
@@ -46,11 +35,11 @@ def get_args():
 
     return parser.parse_args()
 
-def load_engine(engine_file_path):
-    assert os.path.exists(engine_file_path)
-    print("Reading engine from file {}".format(engine_file_path))
-    with open(engine_file_path, "rb") as f, trt.Runtime(TRT_LOGGER) as runtime:
-        return runtime.deserialize_cuda_engine(f.read())
+#def load_engine(engine_file_path):
+#    assert os.path.exists(engine_file_path)
+#    print("Reading engine from file {}".format(engine_file_path))
+#    with open(engine_file_path, "rb") as f, trt.Runtime(TRT_LOGGER) as runtime:
+#        return runtime.deserialize_cuda_engine(f.read())
 
 def preprocess(data):
     data=np.asarray(data).astype('float32')/255.0
@@ -121,17 +110,20 @@ class TrtModel:
                 host_mem = cuda.pagelocked_empty(size, self.dtype)
                 # device memory 할당
                 device_mem = cuda.mem_alloc(host_mem.nbytes)
-                
                 # inputs = host_mem
-                inputs = HostDeviceMem(host_mem, device_mem)
-                bindings.append(int(device_mem))
+                inputs = device_mem
+                
             else:
                 # ---- for gpu output ----
                 host_mem = torch.empty(size=size, dtype=torch.float32, device=torch.device("cuda"))
+                print("host_mem")
+                time.sleep(5)
                 device_mem = host_mem.data_ptr()
+                print("device mem")
+                time.sleep(5)
                 # outputs = host_mem
-                outputs = HostDeviceMem(host_mem, device_mem)
-        
+                outputs = host_mem
+            bindings.append(int(device_mem))
 
         return inputs, outputs, bindings, stream
 
@@ -142,8 +134,8 @@ class TrtModel:
         # self.inputs[0].host = x.ravel()
 
         # --------------------------- numpy
-        x = inputs.astype(self.dtype)
-        x = np.ascontiguousarray(x)
+        inputs = inputs.astype(self.dtype)
+        inputs = np.ascontiguousarray(inputs)
         # np.copyto(self.inputs.host,x)
         
         # # x.ravel is Returns to a continuous 1-dimensional plane
@@ -155,16 +147,16 @@ class TrtModel:
         # print("self.inputs.data_ptr() :",type(self.inputs.data_ptr()))
         # print("self.inputs.data_ptr() :",self.inputs.data_ptr())
         
-        cuda.memcpy_htod_async(self.inputs.device, x, self.stream)
+        cuda.memcpy_htod_async(self.inputs, inputs, self.stream)
         # infer time check
         only_run = time.time()
         check = self.context.execute_async_v2(bindings=self.bindings, stream_handle=self.stream.handle)
         i_time = time.time()-only_run
         print(f"after inference")
-        cuda.memcpy_dtoh_async(self.outputs.host, self.outputs.device, self.stream)
+        #cuda.memcpy_dtoh_async(self.outputs.host, self.outputs.device, self.stream)
         self.stream.synchronize()
 
-        return self.outputs.host , i_time
+        return self.outputs , i_time
 
     def __del__(self):
         if self.engine is not None:
@@ -181,12 +173,12 @@ def lib_version():
 if __name__=='__main__':
     kargs = vars(get_args())
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model_path = kargs["checkpoint"]
     # lib_version()
     
     # --------------------------------------------
     # file check
     # --------------------------------------------
-    model_path = kargs["checkpoint"]
     if os.path.exists(model_path):
         if kargs['torch']:
             if kargs["wrapped"]:
@@ -204,6 +196,8 @@ if __name__=='__main__':
                 exit(1)
 
         elif kargs['torch2trt']:
+            # import torch2trt
+            from torch2trt import TRTModule
             # check torch2trt model
             if "torch2trt" in model_path:
                 print(f"{model_path} model loading ....")
@@ -214,6 +208,16 @@ if __name__=='__main__':
                 exit(1)
 
         elif kargs['trt']:
+            # import tensorrt
+            try:
+                import tensorrt as trt
+                import pycuda.autoinit
+                import pycuda.driver as cuda
+
+            except ImportError:
+                print("Failed to load tensorrt, pycuda")
+                exit(1)
+
             if ".engine" in model_path:
                 TRT_LOGGER = trt.Logger()
                 print(f"{model_path} engine loading ...")
@@ -234,34 +238,44 @@ if __name__=='__main__':
     # --------------------------------------------
     # video info check
     # --------------------------------------------
-    if not os.path.exists(kargs['video']):
-        print('input video is not exist\n')
-        exit(1)
-    cap = cv2.VideoCapture(kargs['video'])
-    
-    frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))//2
-    frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))//2
+    out_name = os.path.basename(kargs['checkpoint']).split('.')[0] + '.mp4'
+    if kargs['cam']:
+        cap = cv2.VideoCapture(0)
+    else:
+        if not os.path.exists(kargs['video']):
+            print('input video is not exist\n')
+            exit(1)
+        cap = cv2.VideoCapture(kargs['video'])
+        out_name = kargs['video'][:-4] + '_' + out_name
+
+    frame_width = 640
+    frame_height = 360
+    # frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))//2
+    # frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))//2
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH,frame_width)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT,frame_height)
     fps = int(cap.get(cv2.CAP_PROP_FPS))
+    cap.set(cv2.CAP_PROP_FPS,30)
     print(f'video ({frame_width},{frame_height}), {fps} fps')
 
     # ----------------------------------------------
     # video write
     # ----------------------------------------------
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    out_name = kargs['video'][:-4]+'_output.mp4'
     out_cap = cv2.VideoWriter(out_name,fourcc,fps,(frame_width,frame_height))
-    print(f"{kargs['video']} encoding ...")
+    print(f"{out_name} encoding ...")
+
+    total_frame=0
+    only_infer_time = 0
 
     # if kargs['test']:
     #     create_builder = Load_engine(onnx_path=kargs['onnx'])
     #     e, l = create_builder.parse_or_load()
     #     exit(1)
     
-    
     if kargs['torch'] or kargs['torch2trt']:
-        print("Running Pytorch\n")
-        total_frame=0
-        only_infer_time = 0
+        print("Running pytorch or torch2trt\n")
+ 
         with torch.no_grad():
             start = time.time()
             while True:
@@ -269,56 +283,51 @@ if __name__=='__main__':
                 if not ret:
                     print('cap.read is failed')
                     break
+                total_frame +=1
+                #origin = cv2.resize(frame, (frame_width,frame_height))
+                frame = org_frame.copy()
                 
-                frame = cv2.resize(frame, (frame_width,frame_height))
-                frame = cv2.cvtColor(frame,cv2.COLOR_BGR2RGB)
-                input_image = F.to_tensor(frame).to(device).unsqueeze(0)
-                # input_image = F.to_tensor(frame).unsqueeze(0)
-                # print(f"total frame : {total_frame}")
+                if not kargs["wrapped"]:
+                    frame = cv2.cvtColor(frame,cv2.COLOR_BGR2RGB)
+                    frame = F.to_tensor(frame).unsqueeze(0).cuda()
+
                 only_run = time.time()
-                predict = model(input_image)
+                predict = model(frame)
                 only_infer_time += time.time()-only_run
                 
-                #print(predict.shape)
                 predict = predict.detach().squeeze(0).argmax(dim=0).cpu().numpy()
                 predict = mask_colorize(predict,cmap).astype(np.uint8)
                 
-                predict = cv2.addWeighted(frame,0.3,predict,0.7,0)
                 predict = cv2.cvtColor(predict, cv2.COLOR_RGB2BGR)
+                predict = cv2.addWeighted(predict,0.3,org_frame,0.7,0)
                 
                 out_cap.write(predict)
-                total_frame +=1
     
     elif kargs['trt']:
         print("TRT Engine running...\n")
         start = time.time()
-        total_frame =0
-        only_infer_time = 0
-        # read video
         while total_frame < 30:
-            ret, frame = cap.read()
+            ret, org_frame = cap.read()
             if not ret:
                 print('cap.read is failed')
                 break
             total_frame +=1
-            origin = cv2.resize(frame,(frame_width,frame_height))
-            frame = origin.copy()
+            #origin = cv2.resize(frame,(frame_width,frame_height))
+            frame = org_frame.copy()
             
             if not kargs["wrapped"]:
-
                 frame = cv2.cvtColor(frame,cv2.COLOR_BGR2RGB)
-
                 frame = preprocess(frame)
 
             img,t = model(frame)
    
             only_infer_time +=t
             
-            img = imgs.detach().squeeze(0).argmax(dim=0).cpu().numpy()
+            img = img.detach().squeeze(0).argmax(dim=0).cpu().numpy()
             img = mask_colorize(img,cmap).astype(np.uint8)
 
             img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
-            img = cv2.addWeighted(origin,0.3,img,0.7,0)
+            img = cv2.addWeighted(img,0.3,org_frame,0.7,0)
             
             out_cap.write(img)
 

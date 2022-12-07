@@ -13,7 +13,7 @@ from models.model import deeplabv3plus_resnet50,deeplabv3plus_mobilenet
 if __name__=='__main__':
     parser = argparse.ArgumentParser(description="PyTorch Segmentation Training")
     parser.add_argument('-c',"--checkpoint", type=str, default='./checkpoint/mobilenet_plain.pth', help='pytorch weight path')
-    parser.add_argument('-i',"--img_size", nargs='+', type=int, default=[540, 960], help="input image size (height width)")
+    parser.add_argument('-i',"--img_size", nargs='+', type=int, default=[360, 640], help="input image size (height width)")
     parser.add_argument("--num_classes", type=int, default=19, help="num classes (default: 19, cityscapes)")
     parser.add_argument('-O',"--output", type=str, default=None, help='output model name')
     

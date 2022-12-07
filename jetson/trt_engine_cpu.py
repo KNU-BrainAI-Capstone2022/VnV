@@ -32,7 +32,8 @@ def get_args():
     parser.add_argument("--wrapped", action="store_true", help="wrapped model")
 
     # Dataset Options
-    parser.add_argument("--video", type=str, default="../video/220619_2.mp4",help="input video name")
+    parser.add_argument("--video", type=str, default="../video/220619_2.mp4", help="input video name")
+    parser.add_argument("--cam", action='store_true', help="input video name")
 
     # torch2trt option
     parser.add_argument("--torch2trt", action="store_true", help="Using torch2trt module")
@@ -213,38 +214,50 @@ if __name__=='__main__':
     # --------------------------------------------
     # video info check
     # --------------------------------------------
-    if not os.path.exists(kargs['video']):
-        print('input video is not exist\n')
-        exit(1)
-    cap = cv2.VideoCapture(kargs['video'])
-    
-    frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))//2
-    frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))//2
+    out_name = os.path.basename(kargs['checkpoint']).split('.')[0] + '.mp4'
+    if kargs['cam']:
+        cap = cv2.VideoCapture(0)
+    else:
+        if not os.path.exists(kargs['video']):
+            print('input video is not exist\n')
+            exit(1)
+        cap = cv2.VideoCapture(kargs['video'])
+        out_name = kargs['video'][:-4] + '_' + out_name
+
+    frame_width = 640
+    frame_height = 360
+    # frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))//2
+    # frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))//2
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH,frame_width)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT,frame_height)
     fps = int(cap.get(cv2.CAP_PROP_FPS))
+    cap.set(cv2.CAP_PROP_FPS,30)
     print(f'video ({frame_width},{frame_height}), {fps} fps')
 
     # ----------------------------------------------
     # video write
     # ----------------------------------------------
+
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    out_name = kargs['video'][:-4]+'_output.mp4'
     out_cap = cv2.VideoWriter(out_name,fourcc,fps,(frame_width,frame_height))
-    print(f"{kargs['video']} encoding ...")
-    
+    print(f"{out_name} encoding ...")
+
+    total_frame=0
+    only_infer_time = 0
+    # Tensor Input들
     if kargs['torch'] or kargs['torch2trt']:
-        print("Running Pytorch\n")
-        total_frame=0
-        only_infer_time = 0
+        print("Running pytorch or torch2trt\n")
+        
         with torch.no_grad():
             start = time.time()
             while total_frame < 30:
-                ret, frame = cap.read()
+                ret, org_frame = cap.read()
                 if not ret:
                     print('cap.read is failed')
                     break
                 total_frame +=1
-                origin = cv2.resize(frame, (frame_width,frame_height))
-                frame = origin.copy()
+                #origin = cv2.resize(frame, (frame_width,frame_height))
+                frame = org_frame.copy()
                 
                 if not kargs["wrapped"]:
                     frame = cv2.cvtColor(frame,cv2.COLOR_BGR2RGB)
@@ -254,44 +267,44 @@ if __name__=='__main__':
                 predict = model(frame)
                 only_infer_time += time.time()-only_run
                 
-                #print(predict.shape)
-                #predict = predict.detach().squeeze(0).argmax(dim=0).cpu().numpy()
-                #predict = mask_colorize(predict,cmap).astype(np.uint8)
+                predict = predict.detach().squeeze(0).argmax(dim=0).cpu().numpy()
+                predict = mask_colorize(predict,cmap).astype(np.uint8)
                 
-                #predict = cv2.cvtColor(predict, cv2.COLOR_RGB2BGR)
-                #predict = cv2.addWeighted(predict,0.3,origin,0.7,0)
+                predict = cv2.cvtColor(predict, cv2.COLOR_RGB2BGR)
+                predict = cv2.addWeighted(predict,0.3,org_frame,0.7,0)
                 
-                #out_cap.write(predict)
-    
+                out_cap.write(predict)
+    # Numpy Input들
     elif kargs['trt']:
+        from collections import Counter
         print("TRT Engine running...\n")
         start = time.time()
-        total_frame =0
-        only_infer_time = 0
         # read video
         while total_frame < 30:
-            ret, frame = cap.read()
+            ret, org_frame = cap.read()
             if not ret:
                 print('cap.read is failed')
                 break
             total_frame +=1
-            origin = cv2.resize(frame,(frame_width,frame_height))
-            frame = origin.copy()
+            #origin = cv2.resize(frame,(frame_width,frame_height))
+            frame = org_frame.copy()
             
             if not kargs["wrapped"]:
-
                 frame = cv2.cvtColor(frame,cv2.COLOR_BGR2RGB)
-
                 frame = preprocess(frame)
 
             outputs,t = model(frame)
 
             only_infer_time +=t
-
-            img = np.argmax(np.reshape(outputs,(19,frame_height,frame_width)),axis=0)
+            
+            img = np.argmax(outputs.squeeze(0),axis=0)
+            
+            #print(outputs.shape)
+            #print(Counter(outputs.flatten()))
+            #img = np.reshape(outputs,(frame_height,frame_width))
             img = mask_colorize(img,cmap).astype(np.uint8)
             img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
-            img = cv2.addWeighted(origin,0.3,img,0.7,0)
+            img = cv2.addWeighted(img,0.3,org_frame,0.7,0)
             
             out_cap.write(img)
 
