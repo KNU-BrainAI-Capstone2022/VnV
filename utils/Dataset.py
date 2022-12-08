@@ -8,6 +8,29 @@ from torchvision.transforms import Compose
 from .Transform import *
 
 class CustomVOCSegmentation(torch.utils.data.Dataset):
+    cmap = [
+        [0, 0, 0],
+        [128, 0, 0],
+        [0, 128, 0],
+        [128, 128, 0],
+        [0, 0, 128],
+        [128, 0, 128],
+        [0, 128, 128],
+        [128, 128, 128],
+        [64, 0, 0],
+        [192, 0, 0],
+        [64, 128, 0],
+        [192, 128, 0],
+        [64, 0, 128],
+        [192, 0, 128],
+        [64, 128, 128],
+        [192, 128, 128],
+        [0, 64, 0],
+        [128, 64, 0],
+        [0, 192, 0],
+        [128, 192, 0],
+        [0, 64, 128],
+        ]
     def __init__(self, data_dir, image_set="train", transform=None):
         self._classes = [
             "background",
@@ -31,30 +54,6 @@ class CustomVOCSegmentation(torch.utils.data.Dataset):
             "sofa",
             "train",
             "tv/monitor",
-        ]
-
-        self._cmap = [
-            [0, 0, 0],
-            [128, 0, 0],
-            [0, 128, 0],
-            [128, 128, 0],
-            [0, 0, 128],
-            [128, 0, 128],
-            [0, 128, 128],
-            [128, 128, 128],
-            [64, 0, 0],
-            [192, 0, 0],
-            [64, 128, 0],
-            [192, 128, 0],
-            [64, 0, 128],
-            [192, 0, 128],
-            [64, 128, 128],
-            [192, 128, 128],
-            [0, 64, 0],
-            [128, 64, 0],
-            [0, 192, 0],
-            [128, 192, 0],
-            [0, 64, 128],
         ]
     
         self.data_dir = data_dir
