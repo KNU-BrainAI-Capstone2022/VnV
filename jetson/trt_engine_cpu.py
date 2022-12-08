@@ -170,6 +170,7 @@ if __name__=='__main__':
     kargs = vars(get_args())
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model_path = kargs['checkpoint']
+    #model_path = './checkpoint/mobilenet_plain.pth'
 
     # version check
     # lib_version() 
@@ -259,7 +260,7 @@ if __name__=='__main__':
     # Tensor Input들
     if kargs['torch'] or kargs['torch2trt']:
         print("Running pytorch or torch2trt\n")
-        
+        model.eval()
         with torch.no_grad():
             start = time.time()
             while total_frame < 30:
@@ -268,7 +269,7 @@ if __name__=='__main__':
                     print('cap.read is failed')
                     break
                 total_frame +=1
-                #origin = cv2.resize(frame, (frame_width,frame_height))
+                org_frame = cv2.resize(org_frame, (frame_width,frame_height))
                 frame = org_frame.copy()
                 
                 if not kargs["wrapped"]:
@@ -276,10 +277,11 @@ if __name__=='__main__':
                     frame = F.to_tensor(frame).unsqueeze(0).cuda()
 
                 only_run = time.time()
-                predict = model(frame)
+                # predict = model(frame)[0]
+                predict = model(frame)['out'][0]
                 only_infer_time += time.time()-only_run
                 
-                predict = predict.detach().squeeze(0).argmax(dim=0).cpu().numpy()
+                predict = predict.detach().argmax(dim=0).cpu().numpy()
                 predict = mask_colorize(predict,cmap).astype(np.uint8)
                 
                 predict = cv2.cvtColor(predict, cv2.COLOR_RGB2BGR)
@@ -306,18 +308,17 @@ if __name__=='__main__':
                 frame = preprocess(frame)
 
             outputs,t = model(frame)
-            print(f"output -> {outputs.shape},{outputs.dtype}")
+            #print(f"output -> {outputs.shape},{outputs.dtype}")
             only_infer_time +=t
-            print(Counter(outputs.flatten()))
+            #print(Counter(outputs.flatten()))
             #img = np.argmax(outputs.squeeze(0),axis=0)
             
             #print(outputs.shape)
             #print(Counter(outputs.flatten()))
             #img = np.reshape(outputs,(frame_height,frame_width))
-            img = mask_colorize(outputs[0][0],cmap).astype(np.uint8)
+            img = mask_colorize(outputs[0][0].astype(np.uint8),cmap)
             img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
             img = cv2.addWeighted(img,0.3,org_frame,0.7,0)
-            
             out_cap.write(img)
 
         del(model)

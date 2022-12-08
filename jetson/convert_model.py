@@ -17,7 +17,6 @@ if __name__=='__main__':
     parser.add_argument("--num_classes", type=int, default=19, help="num classes (default: 19, cityscapes)")
     parser.add_argument('-O',"--output", type=str, default=None, help='output model name')
     
-    parser.add_argument("--onnx", action="store_ture", help="Create onnx")
     # tensorrt engine from trtexec options
     parser.add_argument("--trtexec", action='store_true', help='Create trt engine(fp16) using trtexec')
     parser.add_argument("--onnx-opset", type=int, default=13, help='Opset version ai.onnx')
@@ -79,7 +78,7 @@ if __name__=='__main__':
         print(f'input shape : {input_size.shape} ({input_size.dtype})')
 
     # torch --> onnx
-    if kargs['onnx']:
+    if kargs['onnxparser'] or kargs['trtexec']:
         if not os.path.exists(onnx_name):
             print(f'\nCreating onnx file...')
             torch.onnx.export(
@@ -88,12 +87,16 @@ if __name__=='__main__':
                 onnx_name,                  # 모델 저장 경로
                 verbose=True,              # 변환 과정
                 export_params=True,         # 모델 파일 안에 학습된 모델 가중치 저장
+                do_constant_folding=True,   # 최적화시 상수 폴딩
                 opset_version = kargs['onnx_opset'],         # onnx 버전
                 input_names=['inputs'],      # 모델의 입력값을 가리키는 이름
                 output_names= ['outputs'],   # 모델의 아웃풋 이름
                 operator_export_type = torch.onnx.OperatorExportTypes.ONNX
             )
             print(f"{onnx_name} -> onnx is done")
+            if kargs['onnxparser']:
+                print("Please try again same command ")
+            exit(1)
 
     if kargs['trtexec']:
         # onnx - > tensorrt
@@ -105,7 +108,7 @@ if __name__=='__main__':
     if kargs['onnxparser']:
         import tensorrt as trt
         
-        def onnx_parsing_trt(onnx_path, max_batch_size=1, max_workspace=30, output_name=None):
+        def onnx_parsing_trt(onnx_path, max_batch_size=1, max_workspace=31, output_name=None):
             engine_name = output_name + '_onnxparser.engine'
 
             logger = trt.Logger(trt.Logger.INFO)
@@ -121,14 +124,14 @@ if __name__=='__main__':
                             else:
                                 logger.log(trt.Logger.INFO, 'Onnx file parsed successfully')
                     # Topk Layer add
-                    topk = net.add_topk(input=net.get_output(0), op=trt.tensorrt.TopKOperation.MAX, k = 1, axes=2)
-                    print(f"topk.num_outputs : {topk.num_outputs}")
-                    topk.name = 'TopK_240'
+                    # topk = net.add_topk(input=net.get_output(0), op=trt.tensorrt.TopKOperation.MAX, k = 1, axes=2)
+                    # print(f"topk.num_outputs : {topk.num_outputs}")
+                    # topk.name = 'TopK_300'
 
-                    #topk.get_output(1).name = 'outputs_topk'
-                    print(f"get_output(1).dtype {topk.get_output(1).dtype}")
-                    net.unmark_output(net.get_output(0))
-                    net.mark_output(topk.get_output(1))
+                    # topk.get_output(1).name = 'topk_outputs'
+                    # print(f"get_output(1).dtype {topk.get_output(1).dtype}")
+                    # net.unmark_output(net.get_output(0))
+                    # net.mark_output(topk.get_output(1))
                     print(f"net output : {net.get_output(0).dtype}")
                     print(f"net.num_outputs : {net.num_outputs}")
                     config=builder.create_builder_config()
@@ -163,6 +166,7 @@ if __name__=='__main__':
                         s.write(engine.serialize())
                     logger.log(trt.Logger.INFO, f'Inference engine saved to {engine_name}')
             return
+        
         onnx_parsing_trt(onnx_path=onnx_name, output_name=output_name)
             
     # torch -> tensorrt 
