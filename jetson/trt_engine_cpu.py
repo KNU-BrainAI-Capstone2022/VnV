@@ -140,11 +140,11 @@ class TrtModel:
     def __call__(self,inputs,batch_size=1):
 
         # --------------------------- numpy
-        x = inputs.astype(self.dtype)
-        x = np.ascontiguousarray(x)
+        inputs = inputs.astype(self.dtype)
+        inputs = np.ascontiguousarray(inputs)
         # np.copyto(self.inputs.host,x)
 
-        cuda.memcpy_htod_async(self.inputs.device, x, self.stream)
+        cuda.memcpy_htod_async(self.inputs.device, inputs, self.stream)
         # infer time check
         only_run = time.time()
         check = self.context.execute_async_v2(bindings=self.bindings, stream_handle=self.stream.handle)
@@ -278,7 +278,7 @@ if __name__=='__main__':
 
                 only_run = time.time()
                 # predict = model(frame)[0]
-                predict = model(frame)['out'][0]
+                predict = model(frame)['out']
                 only_infer_time += time.time()-only_run
                 
                 predict = predict.detach().argmax(dim=0).cpu().numpy()
@@ -300,15 +300,20 @@ if __name__=='__main__':
                 print('cap.read is failed')
                 break
             total_frame +=1
+            
             #origin = cv2.resize(frame,(frame_width,frame_height))
             frame = org_frame.copy()
+            print(f"frame shape : {frame.shape},{type(frame)}")
+            if kargs['cam']:
+                frame = np.expand_dims(frame,axis=0)
+                print(frame.shape)
             
             if not kargs["wrapped"]:
                 frame = cv2.cvtColor(frame,cv2.COLOR_BGR2RGB)
                 frame = preprocess(frame)
-
+            print(f"input -> {frame.shape}")
             outputs,t = model(frame)
-            #print(f"output -> {outputs.shape},{outputs.dtype}")
+            print(f"output -> {outputs.shape},{outputs.dtype}")
             only_infer_time +=t
             #print(Counter(outputs.flatten()))
             #img = np.argmax(outputs.squeeze(0),axis=0)
