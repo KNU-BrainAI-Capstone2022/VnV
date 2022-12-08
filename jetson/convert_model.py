@@ -8,7 +8,7 @@ import os
 sys.path.append("../")
 import torch
 import argparse
-from models.model import deeplabv3plus_resnet50,deeplabv3plus_mobilenet
+from models.model import deeplabv3plus_resnet50,deeplabv3plus_mobilenet,deeplabv3_mobilenetv3
 
 if __name__=='__main__':
     parser = argparse.ArgumentParser(description="PyTorch Segmentation Training")
@@ -54,6 +54,7 @@ if __name__=='__main__':
     onnx_name = output_name + '.onnx'
     
     if not os.path.exists(onnx_name) or kargs['torch2trt']:
+        # model = deeplabv3_mobilenetv3(num_classes=21, pretrained_backbone=True)
         if 'resnet50' in kargs['checkpoint']:
             model = deeplabv3plus_resnet50(num_classes=kargs['num_classes'],pretrained_backbone=False)
         elif 'mobilenet' in kargs['checkpoint']:

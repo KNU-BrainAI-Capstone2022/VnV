@@ -244,7 +244,7 @@ if __name__=='__main__':
     cap.set(cv2.CAP_PROP_FRAME_WIDTH,frame_width)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT,frame_height)
     fps = int(cap.get(cv2.CAP_PROP_FPS))
-    cap.set(cv2.CAP_PROP_FPS,5)
+    #cap.set(cv2.CAP_PROP_FPS,5)
     print(f'video ({frame_width},{frame_height}), {fps} fps')
 
     # ----------------------------------------------
@@ -300,7 +300,7 @@ if __name__=='__main__':
                 print('cap.read is failed')
                 break
             total_frame +=1
-            #origin = cv2.resize(frame,(frame_width,frame_height))
+            org_frame = cv2.resize(org_frame,(frame_width,frame_height))
             frame = org_frame.copy()
             
             if not kargs["wrapped"]:
@@ -308,9 +308,9 @@ if __name__=='__main__':
                 frame = preprocess(frame)
 
             outputs,t = model(frame)
-            #print(f"output -> {outputs.shape},{outputs.dtype}")
+            print(f"output -> {outputs.shape},{outputs.dtype}")
             only_infer_time +=t
-            #print(Counter(outputs.flatten()))
+            print(Counter(outputs.flatten()))
             #img = np.argmax(outputs.squeeze(0),axis=0)
             
             #print(outputs.shape)

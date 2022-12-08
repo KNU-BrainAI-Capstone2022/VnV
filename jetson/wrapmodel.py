@@ -10,10 +10,11 @@ class WrappedModel(nn.Module):
         # )
     
     def forward(self,x):
-        x = x.flip(-1)
         x = x.permute(0,3,1,2)
+        x = x.flip(-3)
         x = x / 255.0
         x = self.model(x)
-        x = nn.functional.softmax(x,dim=1)
-        x = torch.topk(x,1,dim=1,stored=False)[1]
+        # x = self.model(x)['out']
+        # x = torch.argmax(x, dim=1)
+        x = torch.topk(x,k=1,dim=1,sorted=False)[1]
         return x
