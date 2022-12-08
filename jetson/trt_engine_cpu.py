@@ -275,7 +275,7 @@ if __name__=='__main__':
                 if not kargs["wrapped"]:
                     frame = cv2.cvtColor(frame,cv2.COLOR_BGR2RGB)
                     frame = F.to_tensor(frame).unsqueeze(0).cuda()
-
+                print(frame.shape)
                 only_run = time.time()
                 # predict = model(frame)[0]
                 predict = model(frame)['out']
