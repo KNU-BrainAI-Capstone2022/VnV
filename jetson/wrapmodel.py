@@ -1,5 +1,6 @@
 import torch.nn as nn
 import torchvision.transforms.functional as F
+import torch
 
 class WrappedModel(nn.Module):
     def __init__(self,model):
@@ -14,4 +15,5 @@ class WrappedModel(nn.Module):
         x = x.permute(0,3,1,2)
         x = x / 255.0
         x = self.model(x)
+        x = torch.topk(x,1,dim=1,sorted=False)[1]
         return x

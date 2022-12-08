@@ -101,7 +101,7 @@ if __name__=='__main__':
     if kargs['onnxparser']:
         import tensorrt as trt
         
-        def onnx_parsing_trt(onnx_path, max_batch_size=1, max_workspace=30, output_name=None):
+        def onnx_parsing_trt(onnx_path, max_batch_size=1, max_workspace=32, output_name=None):
             engine_name = output_name + '_onnxparser.engine'
 
             logger = trt.Logger(trt.Logger.INFO)
@@ -117,12 +117,12 @@ if __name__=='__main__':
                             else:
                                 logger.log(trt.Logger.INFO, 'Onnx file parsed successfully')
                     # Topk Layer add
-                    topk = net.add_topk(input=net.get_output(0), op=trt.tensorrt.TopKOperation.MAX, k = 1, axes=2)
-                    topk.name = 'TopK_240'
-                    topk.get_output(1).name = 'outputs_topk'
+                    # topk = net.add_topk(input=net.get_output(0), op=trt.tensorrt.TopKOperation.MAX, k = 1, axes=2)
+                    # topk.name = 'TopK_240'
+                    # topk.get_output(1).name = 'outputs_topk'
                     
-                    net.unmark_output(net.get_output(0))
-                    net.mark_output(topk.get_output(1))
+                    # net.unmark_output(net.get_output(0))
+                    # net.mark_output(topk.get_output(1))
                     
                     config=builder.create_builder_config()
 
