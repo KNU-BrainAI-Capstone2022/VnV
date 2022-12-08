@@ -218,10 +218,10 @@ if __name__=='__main__':
         exit(1)
 
     # cmap load
-    # cmap = CustomCityscapesSegmentation.cmap
-    palette = torch.tensor([2 ** 25 - 1, 2 ** 15 - 1, 2 ** 21 - 1])
-    cmap = torch.as_tensor([i for i in range(21)])[:, None] * palette
-    cmap = (cmap % 255).numpy().astype("uint8")
+    cmap = CustomCityscapesSegmentation.cmap
+    # palette = torch.tensor([2 ** 25 - 1, 2 ** 15 - 1, 2 ** 21 - 1])
+    # cmap = torch.as_tensor([i for i in range(21)])[:, None] * palette
+    # cmap = (cmap % 255).numpy().astype("uint8")
     print("Model Loading Done.")
 
     # --------------------------------------------
@@ -301,16 +301,16 @@ if __name__=='__main__':
                 break
             total_frame +=1
             
-            #origin = cv2.resize(frame,(frame_width,frame_height))
+            if not kargs['cam']:
+                org_frame = cv2.resize(org_frame,(frame_width,frame_height))
+                
             frame = org_frame.copy()
             print(f"frame shape : {frame.shape},{type(frame)}")
-            if kargs['cam']:
-                frame = np.expand_dims(frame,axis=0)
-                print(frame.shape)
-            
+            frame = np.expand_dims(frame,axis=0)
             if not kargs["wrapped"]:
                 frame = cv2.cvtColor(frame,cv2.COLOR_BGR2RGB)
                 frame = preprocess(frame)
+                
             print(f"input -> {frame.shape}")
             outputs,t = model(frame)
             print(f"output -> {outputs.shape},{outputs.dtype}")
