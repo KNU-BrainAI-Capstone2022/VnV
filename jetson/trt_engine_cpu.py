@@ -8,7 +8,7 @@ from utils.Util import mask_colorize
 import time
 import torch
 import torchvision.transforms.functional as F
-from utils.Dataset import CustomCityscapesSegmentation
+from utils.Dataset import CustomVOCSegmentation
 from models.model import deeplabv3plus_mobilenet,deeplabv3_mobilenetv3
 from torch2trt import TRTModule
 from PIL import Image
@@ -218,7 +218,7 @@ if __name__=='__main__':
         exit(1)
 
     # cmap load
-    cmap = CustomCityscapesSegmentation.cmap
+    cmap = CustomVOCSegmentation.cmap
     # palette = torch.tensor([2 ** 25 - 1, 2 ** 15 - 1, 2 ** 21 - 1])
     # cmap = torch.as_tensor([i for i in range(21)])[:, None] * palette
     # cmap = (cmap % 255).numpy().astype("uint8")
@@ -305,15 +305,15 @@ if __name__=='__main__':
                 org_frame = cv2.resize(org_frame,(frame_width,frame_height))
                 
             frame = org_frame.copy()
-            print(f"frame shape : {frame.shape},{type(frame)}")
-            frame = np.expand_dims(frame,axis=0)
+            #print(f"frame shape : {frame.shape},{type(frame)}")
             if not kargs["wrapped"]:
                 frame = cv2.cvtColor(frame,cv2.COLOR_BGR2RGB)
                 frame = preprocess(frame)
                 
-            print(f"input -> {frame.shape}")
+            frame = np.expand_dims(frame,axis=0)
+            # print(f"input -> {frame.shape}")
             outputs,t = model(frame)
-            print(f"output -> {outputs.shape},{outputs.dtype}")
+            # print(f"output -> {outputs.shape},{outputs.dtype}")
             only_infer_time +=t
             #print(Counter(outputs.flatten()))
             #img = np.argmax(outputs.squeeze(0),axis=0)
@@ -323,7 +323,7 @@ if __name__=='__main__':
             #img = np.reshape(outputs,(frame_height,frame_width))
             img = mask_colorize(outputs[0][0].astype(np.uint8),cmap)
             img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
-            img = cv2.addWeighted(img,0.3,org_frame,0.7,0)
+            img = cv2.addWeighted(img,0.5,org_frame,0.5,0)
             out_cap.write(img)
 
         del(model)
