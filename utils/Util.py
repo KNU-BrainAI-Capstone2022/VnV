@@ -89,6 +89,14 @@ class Denormalize(object):
         return normalize(tensor, self._mean, self._std)
 
 def mask_colorize(masks,cmap):
+    """
+    Args:
+        img (np.ndarray): np.ndarray of shape HxWxC and dtype uint8 (BGR Image)
+        mask (np.ndarray): np.ndarray of shape: HxW and dtype int range of [0,num_classes).
+        cmap (np.ndarray) : np.ndarray containing the colors of shape NUM_CLASSES x C and its dtype uint8 (order : RGB)
+    Returns:
+        newimg (np.ndarray[CxHxW]): Image np.ndarray, with segmentation masks drawn on top.
+    """
     # masks : BxCxHxW
     # if C != 1, argmax
     # B H W -> B C H W (Torch.Tensor)
@@ -110,17 +118,15 @@ def mask_colorize(masks,cmap):
         return torch.cat([r_mask,g_mask,b_mask],dim=1)
     elif isinstance(masks,np.ndarray): # H W
         assert masks.ndim == 2
-        cmap_ = np.array(cmap)
         r_mask = np.zeros_like(masks,dtype=np.uint8)
         g_mask = np.zeros_like(masks,dtype=np.uint8)
         b_mask = np.zeros_like(masks,dtype=np.uint8)
         for k in range(len(cmap)):
             indices = masks == k
-            r_mask[indices] = cmap_[k,0]
-            g_mask[indices] = cmap_[k,1]
-            b_mask[indices] = cmap_[k,2]
-        return np.stack([r_mask,g_mask,b_mask],axis=2)
-
+            r_mask[indices] = cmap[k,0]
+            g_mask[indices] = cmap[k,1]
+            b_mask[indices] = cmap[k,2]
+        return np.stack([b_mask,g_mask,r_mask],axis=2)
 
 def make_figure(images,targets,outputs,colormap):
     n=images.size(0)

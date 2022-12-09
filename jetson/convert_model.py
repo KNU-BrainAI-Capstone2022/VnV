@@ -54,17 +54,17 @@ if __name__=='__main__':
     onnx_name = output_name + '.onnx'
     
     if not os.path.exists(onnx_name) or kargs['torch2trt']:
-        # model = deeplabv3_mobilenetv3(num_classes=21, pretrained_backbone=True)
-        if 'resnet50' in kargs['checkpoint']:
-            model = deeplabv3plus_resnet50(num_classes=kargs['num_classes'],pretrained_backbone=False)
-        elif 'mobilenet' in kargs['checkpoint']:
-            model = deeplabv3plus_mobilenet(num_classes=kargs['num_classes'], pretrained_backbone=False)
+        model = deeplabv3_mobilenetv3(num_classes=21, pretrained_backbone=True)
+        # if 'resnet50' in kargs['checkpoint']:
+        #     model = deeplabv3plus_resnet50(num_classes=kargs['num_classes'],pretrained_backbone=False)
+        # elif 'mobilenet' in kargs['checkpoint']:
+        #     model = deeplabv3plus_mobilenet(num_classes=kargs['num_classes'], pretrained_backbone=False)
         
 
-        # load weight
-        print(f'Load model....')
-        model_state= torch.load(kargs['checkpoint'])
-        model.load_state_dict(model_state['model_state'])
+        # # load weight
+        # print(f'Load model....')
+        # model_state= torch.load(kargs['checkpoint'])
+        # model.load_state_dict(model_state['model_state'])
 
         if kargs['wrapped']:
             from wrapmodel import WrappedModel
