@@ -38,7 +38,7 @@ if __name__=='__main__':
     if kargs['device'] == None:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f'device : {device}')
-
+    
     if kargs['output'] is None:
         output_name = kargs['checkpoint'][:-4]
     else:
