@@ -28,7 +28,7 @@ def get_args():
     parser.add_argument('-n',"--num_classes", type=int, help="number of classes of model checkpoint")
 
     # Video Options
-    parser.add_argument("--video", type=str, help="input video name")
+    parser.add_argument("--video", type=str, default='', help="input video name")
     parser.add_argument("--cam", action='store_true', help="input video name")
 
     # torch option
@@ -53,7 +53,7 @@ def func_torch_plain(model,frame):
         
     only_run = time.time()
     predict = model(frame)[0]
-    only_infer_time += time.time()-only_run
+    only_infer_time = time.time()-only_run
     
     predict = predict.detach().argmax(dim=0).cpu().numpy()
     
@@ -64,22 +64,22 @@ def func_torch_wrapped(model,frame):
         
     only_run = time.time()
     predict = model(frame)[0][0]
-    only_infer_time += time.time()-only_run
+    only_infer_time = time.time()-only_run
     
     predict = predict.detach().cpu().numpy()
 
     return predict, only_infer_time
 
 def func_trt_plain(model,frame):
-    frame = np.expand_dims(frame,axis=0)
     frame = cv2.cvtColor(frame,cv2.COLOR_BGR2RGB)
     frame = preprocess(frame)
-        
+    frame = np.expand_dims(frame,axis=0)
+    
     only_run = time.time()
     predict = model(frame)[0]
-    only_infer_time += time.time()-only_run
+    only_infer_time = time.time()-only_run
     
-    predict = predict.argmax(dim=0)
+    predict = predict.argmax(axis=0)
 
     return predict, only_infer_time
 
@@ -88,7 +88,7 @@ def func_trt_wrapped(model,frame):
     
     only_run = time.time()
     predict = model(frame)[0][0]
-    only_infer_time += time.time()-only_run
+    only_infer_time = time.time()-only_run
 
     return predict, only_infer_time
 
@@ -212,7 +212,7 @@ if __name__=='__main__':
             if model_path.endswith(".engine"):
                 TRT_LOGGER = trt.Logger()
                 print(f"{model_path} tensorrt engine loading ...")
-                model = TrtModel(model_path,**kargs)
+                model = TrtModel(model_path,wrapped=kargs['wrapped'])
             else:
                 print(f"{model_path} is not tensorrt engine")
                 exit(1)
@@ -251,6 +251,9 @@ if __name__=='__main__':
     out_name = os.path.basename(kargs['checkpoint']).split('.')[0] + '.mp4'
     if kargs['cam']:
         cap = cv2.VideoCapture(0)
+        if not cap.isOpened():
+            print("Camera open failed")
+            exit(1)
     else:
         if not os.path.exists(kargs['video']):
             print('input video does not exist\n')
@@ -260,14 +263,14 @@ if __name__=='__main__':
 
     frame_width = 640
     frame_height = 360
-    # frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))//2
-    # frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))//2
+    
     if kargs['cam']:
         cap.set(cv2.CAP_PROP_FRAME_WIDTH,frame_width)
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT,frame_height)
-    cap.set(cv2.CAP_PROP_FPS,4)
+    # cap.set(cv2.CAP_PROP_FPS,4)
+    
     fps = int(cap.get(cv2.CAP_PROP_FPS))
-    print(f'video ({frame_width},{frame_height}), {fps} fps')
+    print(f'frame size ({int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))},{int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))}), {fps} fps')
 
     # ----------------------------------------------
     # video write
@@ -279,7 +282,7 @@ if __name__=='__main__':
 
     total_frame = 0
     only_infer_time = 0
-    num_frames = 150
+    num_frames = 30
     
     if kargs['torch']:
         print("Running pytorch\n")
@@ -310,6 +313,7 @@ if __name__=='__main__':
     del(model)
     print(f'finish encoding - {out_name}')
     print(f'total frame = {total_frame} \ntotal time = {total_time:.2f}s')
-    print(f'average time = {total_time/total_frame:.2f}s')
+    if total_frame:
+        print(f'average time = {total_time/total_frame:.2f}s')
     print(f'Only inference time : {only_infer_time:.2f}s')
     
