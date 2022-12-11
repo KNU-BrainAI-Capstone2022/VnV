@@ -1,0 +1,7 @@
+__pycache__
+checkpoint/*
+result/*
+*.mp4
+*.jpg
+*.JPEG
+*.PNG

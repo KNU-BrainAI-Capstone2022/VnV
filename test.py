@@ -131,9 +131,12 @@ def main():
             # Load Checkpoint
             dict_model = torch.load(kargs['checkpoint'])
             model.load_state_dict(dict_model['model_state'])
+            # torch.save(model,"deeplabv3plus_mobilenetv2_cityscapes.pth")
+            # quit()
             cur_iter = dict_model['cur_iter']
             best_score = dict_model['best_score']
             print(cur_iter,best_score)
+            
     # Loss
     criterion = torch.nn.CrossEntropyLoss(ignore_index=255)
     
