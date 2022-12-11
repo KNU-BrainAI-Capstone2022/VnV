@@ -1,69 +1,28 @@
 # onnx == 1.11.0
 # onnxruntime == 1.10.0
+# http://www.xavierdupre.fr/app/onnxcustom/helpsphinx/tutorial_onnxruntime/inference.html 
 
 import cv2
 import time
-import models
 import torch
 import os
 import torchvision.transforms.functional as F
 import numpy as np
-from utils import Dataset,Util
 import argparse
-import torch_tensorrt
-import tensorrt as trt
-import pycuda.driver as cuda
-import pycuda.autoinit
 import onnx
 import onnxruntime
+from utils.colormap import mask_colorize,cmap_cityscapes,cmap_voc
 
-
-# Read trt file
-def loadEngine2TensorRT(filepath):
-    G_LOGGER = trt.Logger(trt.Logger.WARNING)
-    # Deserialization engine
-    with open(filepath, "rb") as f, trt.Runtime(G_LOGGER) as runtime:
-        engine = runtime.deserialize_cuda_engine(f.read())
-        return engine
 
 def to_numpy(tensor):
     return tensor.detach().cpu().numpy() if tensor.requires_grad else tensor.cpu().numpy()
-
-# This operation is a general function
-def infer(context, input_img, output_size, batch_size):
-    # Convert input data to Float32. If this type needs to be converted, there will be many errors
-    input_img = input_img.astype(np.float32)
-    # Create output array to receive data
-    output = np.empty(output_size, dtype=np.float32)
-
-    # Allocate device memory
-    d_input = cuda.mem_alloc(batch_size * input_img.nbytes)
-    d_output = cuda.mem_alloc(batch_size * output.nbytes)
-
-    bindings = [int(d_input), int(d_output)]
-
-    stream = cuda.Stream()
-
-    # Transfer input data to device
-    cuda.memcpy_htod_async(d_input, input_img, stream)
-    # Execute model
-    context.execute_async(batch_size, bindings, stream.handle, None)
-    # Transfer predictions back
-    cuda.memcpy_dtoh_async(output, d_output, stream)
-
-    stream.synchronize()
-
-    # Return predictions
-    return output
 
 def get_args():
     parser = argparse.ArgumentParser(description="PyTorch Segmentation Video Encoding")
     # model option
     parser.add_argument('-c', "--checkpoint", type=str, default=None,help="model weights path")
     # Dataset Options
-    parser.add_argument("--video", type=str, help="input video name",required=True)
     parser.add_argument("--test", action='store_true', help="Generate thunbnail")
-    parser.add_argument("--pair", action='store_true', help="Generate pair frame")
     parser.add_argument("--int8", action='store_true', help="data type int8")
     parser.add_argument("--fp16", action='store_true', help="data type fp16")
     return parser.parse_args()
@@ -73,51 +32,28 @@ if __name__=='__main__':
     kargs = vars(get_args())
 
     # fp16
-    kargs['weights'] = "test_half.onnx"
+    kargs['weights'] = "./checkpoint/deeplabv3_mobilenetv3_voc2012_plain.onnx"
     
     print(f"\nWeights loading...\n")
-    # ckpt=os.path.join(ckpt_dir,kargs['model']+'_'+kargs['type']+'.trt')
     if not os.path.exists(kargs['weights']):
         print('Weights is not exist\n')
         exit(1)
 
     # load pytorch model
     onnx_file_path = kargs['weights']
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = onnxruntime.get_device()
     os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
     print(f'device {device}')
 
-    # video write
-    input_video = 'video/'+kargs['video']+'.mp4'
-    if not os.path.exists('./video'):
-        os.mkdir('./video')
-    if not os.path.exists(input_video):
-        print('input video is not exist\n')
-        exit(1)
-    cap = cv2.VideoCapture(input_video)
-
-    frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    fps = int(cap.get(cv2.CAP_PROP_FPS))
-    print(f'video ({frame_width},{frame_height}), {fps} fps')
-
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    if kargs['pair']:
-        out_name = 'video/'+kargs['video']+'_output_pair.mp4'
-        out_cap = cv2.VideoWriter(out_name,fourcc,fps,(frame_width,2*frame_height))
-    else:
-        out_name = 'video/'+kargs['video']+'_output.mp4'
-        out_cap = cv2.VideoWriter(out_name,fourcc,fps,(frame_width,frame_height))
-    print(f'{input_video} encoding ...')
+ 
+    frame_width = 640
+    frame_height = 360
+    img_name = "test.jpg"
+    out_name = 'test_output.jpg'
 
     # cmap load
-    classes = Dataset.CustomCityscapesSegmentation('dataset')
-    cmap = classes.getcmap()
+    cmap = np.array(cmap_voc,dtype=np.uint8)
 
-    # # Read trt file
-    # engine = loadEngine2TensorRT(kargs['weights'])
-    # # Create context
-    # context = engine.create_execution_context()
     print(f'\nonnx weights loading ...')
 
     onnx_model = onnx.load(onnx_file_path)
@@ -125,15 +61,57 @@ if __name__=='__main__':
     # # slow than pytorch
     session = onnxruntime.InferenceSession(onnx_file_path, providers=['CUDAExecutionProvider', 'CPUExecutionProvider'])
     # onnx_opt = onnxruntime.SessionOptions()
-    # onnx_opt.graph_optimization_level = onnxruntime.GraphOptimizationLevel.ORT_ENABLE_ALL
+    # # onnx_opt.graph_optimization_level = onnxruntime.GraphOptimizationLevel.ORT_ENABLE_ALL
     # onnx_opt.enable_profiling=True
     # session = onnxruntime.InferenceSession(onnx_file_path, onnx_opt, providers=['CUDAExecutionProvider','CPUExecutionProvider'])
+    print(f"input name : {session.get_inputs()[0].name}")
+    print(f"input shape : {session.get_inputs()[0].shape}")
+    print(f"input type : {session.get_inputs()[0].type}")
+    
+    print(f"output name : {session.get_outputs()[0].name}")
+    print(f"output shape : {session.get_outputs()[0].shape}")
+    print(f"output type : {session.get_outputs()[0].type}")
+    
     binding = session.io_binding()
+    total_frame=1
     
-    mean = np.array([0.485,0.456,0.406])
-    std = np.array([0.229,0.224,0.225])
     
-    total_frame=0
+    em = cv2.imread("test.jpg")
+    ori_img = cv2.resize(em, (frame_width,frame_height))
+    em = cv2.cvtColor(ori_img,cv2.COLOR_BGR2RGB)
+    em = np.asarray(em).astype('float32')/255.0
+    em =np.moveaxis(em, 2, 0)
+    em = np.expand_dims(em,axis=0).astype(np.float32)
+    print(em.shape, em.dtype)
+    # inputs = onnxruntime.OrtValue.ortvalue_from_numpy(inputs,device_type='cuda',device_id=0)
+    # input cpu
+    # inputs = onnxruntime.OrtValue.ortvalue_from_numpy(em)
+    
+    # print(f"equal test -> {np.array_equal(inputs.numpy(), em)}")
+    # print(f"inputs.device_name() : {inputs.device_name()}")  # 'cpu'
+    # print(f"inputs.shape() : {inputs.shape()}")   # shape of the numpy array X
+    # print(f"inputs.data_type() : {inputs.data_type()}")  # 'cpu'
+    # print(f"inputs.is_tensor() : {inputs.is_tensor()}")  #  # 'tensor(float)'
+    # result = session.run(["outputs"], {"inputs": inputs})[0][0]
+    # print(result.shape, type(result))
+    
+    binding.bind_cpu_input('inputs',em)
+    binding.bind_output('outputs')
+    session.run_with_iobinding(binding)
+    result = binding.copy_outputs_to_cpu()[0][0][0]
+    print(result.shape, result.dtype)
+    
+    # result = np.squeeze(result,axis=0)
+    # result = np.argmax(result,axis=0)
+    result = mask_colorize(result,cmap)
+    # print(result.shape)
+    result = cv2.addWeighted(ori_img,0.3,result,0.7,0)
+    result = cv2.cvtColor(result, cv2.COLOR_RGB2BGR)
+
+    # cv2.imwrite('test_output.jpg',result)
+    # print('Generate test.jpg')
+    
+    exit(1)
     
     start = time.time()
     print("Start onnx Test...")
@@ -144,21 +122,21 @@ if __name__=='__main__':
             print('cap.read is failed')
             break
         frame = cv2.cvtColor(frame,cv2.COLOR_BGR2RGB)
-        # inputs = frame / 255.0
-        # inputs = np.transpose(inputs, (2,0,1))
+        inputs = frame / 255.0
+        inputs = np.transpose(inputs, (2,0,1))
         # inputs = (inputs- mean.reshape(-1,1,1)) / std.reshape(-1,1,1)
-        # # print(inputs.shape)
-        # inputs = np.expand_dims(inputs,axis=0).astype(np.float32)
+        # print(inputs.shape)
+        inputs = np.expand_dims(inputs,axis=0).astype(np.float32)
         # # print(inputs.shape, inputs.dtype)
 
         # # input cuda
-        # inputs = onnxruntime.OrtValue.ortvalue_from_numpy(inputs,device_type='cuda',device_id=0)
+        inputs = onnxruntime.OrtValue.ortvalue_from_numpy(inputs,device_type='cuda',device_id=0)
 
-        # binding.bind_cpu_input('input',inputs)
-        # binding.bind_output('outputs')
-        # session.run_with_iobinding(binding)
-        # img_out_y = binding.copy_outputs_to_cpu()[0]
-        # # print(img_out_y.shape, type(img_out_y))
+        binding.bind_cpu_input('input',inputs)
+        binding.bind_output('outputs')
+        session.run_with_iobinding(binding)
+        img_out_y = binding.copy_outputs_to_cpu()[0]
+        print(img_out_y.shape, type(img_out_y))
 
         # # -------------------------------------------
         # # for input, output -> torch.to(device)
@@ -221,17 +199,11 @@ if __name__=='__main__':
         result = Util.mask_colorize(img_out_y,cmap)
         result = cv2.addWeighted(frame,0.3,result,0.7,0)
         result = cv2.cvtColor(result, cv2.COLOR_RGB2BGR)
-        
-        if kargs['pair']:
-            frame = cv2.cvtColor(frame,cv2.COLOR_RGB2BGR)
-            result = cv2.vconcat([frame,result])
-        if kargs['test']:
-            cv2.imwrite('video/test.jpg',result)
-            print('Generate test.jpg')
-            exit(1)
-        else:
-            out_cap.write(result)
-        total_frame +=1
+
+        cv2.imwrite('video/test.jpg',result)
+        print('Generate test.jpg')
+        exit(1)
+
 print(f'finish encoding - {out_name}')
 total_time = time.time()-start
 print(f'total frame = {total_frame} \ntotal time = {total_time:.2f}s')

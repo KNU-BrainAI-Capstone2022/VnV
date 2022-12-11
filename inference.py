@@ -30,6 +30,9 @@ def get_args():
     # Video Options
     parser.add_argument("--video", type=str, default='', help="input video name")
     parser.add_argument("--cam", action='store_true', help="input video name")
+    
+    # onnxrumtime option
+    parser.add_argument("--ort", action='store_true', help="Using onnx model for inference")
 
     # torch option
     parser.add_argument("--torch", action='store_true', help="Using torch deeplabv3+_mobilenet model for inference")
@@ -84,6 +87,28 @@ def func_trt_plain(model,frame):
     return predict, only_infer_time
 
 def func_trt_wrapped(model,frame):
+    frame = np.expand_dims(frame,axis=0)
+    
+    only_run = time.time()
+    predict = model(frame)[0][0]
+    only_infer_time = time.time()-only_run
+
+    return predict, only_infer_time
+
+def func_ort_plain(model,frame):
+    frame = cv2.cvtColor(frame,cv2.COLOR_BGR2RGB)
+    frame = preprocess(frame)
+    frame = np.expand_dims(frame,axis=0)
+    
+    only_run = time.time()
+    predict = model(frame)[0]
+    only_infer_time = time.time()-only_run
+    
+    predict = predict.argmax(axis=0)
+
+    return predict, only_infer_time
+
+def func_ort_wrapped(model,frame):
     frame = np.expand_dims(frame,axis=0)
     
     only_run = time.time()
@@ -182,6 +207,54 @@ class TrtModel:
         if self.engine is not None:
             del self.engine
 
+class ortModel:
+    def __init__(self,onnx_path,input_dtype=np.float32):
+        
+        self.in_dtype = input_dtype
+
+        onnx_model = onnx.load(onnx_path)
+        onnx.checker.check_model(onnx_model)
+        
+        device = onnxruntime.get_device()
+        if device =="GPU":
+            self.session = onnxruntime.InferenceSession(onnx_path, providers=['CUDAExecutionProvider', 'CPUExecutionProvider'])
+        else:
+            self.session = onnxruntime.InferenceSession(onnx_path, providers=['CPUExecutionProvider'])
+        
+        self.input_name = self.session.get_inputs()[0].name
+        self.input_shape = self.session.get_inputs()[0].shape
+        self.input_type = self.session.get_inputs()[0].type
+        self.output_name = self.session.get_outputs()[0].name
+        self.output_shape = self.session.get_outputs()[0].shape
+        self.output_type = self.session.get_outputs()[0].type
+        
+        self.binding = self.set_io_binding()
+    
+    def inout_print(self):
+        print(f"input name : {self.input_name}")
+        print(f"input shape : {self.input_shape}")
+        print(f"input type : {self.input_type}")
+        
+        print(f"output name : {self.output_name}")
+        print(f"output shape : {self.output_shape}")
+        print(f"output type : {self.output_type}")
+        
+    def set_io_binding(self):
+        self.inout_print()
+        binding = self.session.io_binding()
+        binding.bind_cpu_input('inputs',np.empty(self.input_shape))
+        binding.bind_output('outputs')
+        return binding
+        
+    def __call__(self,inputs):
+        
+        inputs = inputs.astype(self.in_dtype)
+        self.binding.bind_cpu_input('inputs',inputs)
+        
+        self.session.run_with_iobinding(self.binding)
+        
+        return self.binding.copy_outputs_to_cpu()[0]
+        
 def lib_version():
     # os.environ['CUDA_LAUNCH_BLOCKING']='1'
     print(f"\ntrt version : {trt.__version__}")
@@ -216,8 +289,16 @@ if __name__=='__main__':
             else:
                 print(f"{model_path} is not tensorrt engine")
                 exit(1)
+        elif kargs['ort']:
+            if model_path.endswith(".onnx"):
+                print(f"{model_path} model loading ...")
+                model = ortModel(onnx_path=model_path)
+            else:
+                print(f"{model_path} is not onnx model")
+                exit(1)
+                
         else:
-            print("select option --torch or --trt")
+            print("select option --torch or --trt or --ort")
             exit(1)
     else:
         print(f"{model_path} is not exist")
@@ -231,11 +312,16 @@ if __name__=='__main__':
             func_inference = func_torch_wrapped
         else:
             func_inference = func_torch_plain
-    else:
+    elif kargs['trt']:
         if kargs['wrapped']:
             func_inference = func_trt_wrapped
         else:
             func_inference = func_trt_plain
+    elif kargs['ort']:
+        if kargs['wrapped']:
+            func_inference = func_ort_wrapped
+        else:
+            func_inference = func_ort_plain
     
     # cmap load
     if kargs['num_classes'] == 21 or 'voc2012' in kargs['checkpoint']:
@@ -282,12 +368,14 @@ if __name__=='__main__':
 
     total_frame = 0
     only_infer_time = 0
-    num_frames = 30
+    num_frames = 150
     
     if kargs['torch']:
-        print("Running pytorch\n")
-    else:
+        print("Running pytorch...\n")
+    elif kargs['trt']:
         print("TRT Engine running...\n")
+    else:
+        print("Onnx runtime running...\n")
     with torch.no_grad():
         start = time.time()
         while total_frame < num_frames:
