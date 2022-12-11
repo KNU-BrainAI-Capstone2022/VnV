@@ -209,6 +209,7 @@ class TrtModel:
 
 class ortModel:
     def __init__(self,onnx_path,input_dtype=np.float32):
+        # http://www.xavierdupre.fr/app/onnxruntime/helpsphinx/auto_examples/plot_load_and_predict.html
         
         self.in_dtype = input_dtype
 
@@ -231,13 +232,15 @@ class ortModel:
         self.binding = self.set_io_binding()
     
     def inout_print(self):
-        print(f"input name : {self.input_name}")
-        print(f"input shape : {self.input_shape}")
-        print(f"input type : {self.input_type}")
-        
-        print(f"output name : {self.output_name}")
-        print(f"output shape : {self.output_shape}")
-        print(f"output type : {self.output_type}")
+        print(f"---------------input---------------")
+        print(f"   input name : {self.input_name}")
+        print(f"   input shape : {self.input_shape}")
+        print(f"   input type : {self.input_type}")
+        print(f"---------------output--------------")
+        print(f"   output name : {self.output_name}")
+        print(f"   output shape : {self.output_shape}")
+        print(f"   output type : {self.output_type}")
+        print(f"-----------------------------------")
         
     def set_io_binding(self):
         self.inout_print()
@@ -368,7 +371,7 @@ if __name__=='__main__':
 
     total_frame = 0
     only_infer_time = 0
-    num_frames = 150
+    num_frames = 50
     
     if kargs['torch']:
         print("Running pytorch...\n")
